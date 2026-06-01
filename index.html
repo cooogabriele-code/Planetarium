@@ -1,0 +1,3293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar System Explorer</title>
+  <style>
+    :root {
+      --bg-deep:      #030712;
+      --bg-panel:     rgba(8, 13, 24, 0.72);
+      --border:       rgba(149, 205, 255, 0.16);
+      --accent:       #8fd3ff;
+      --accent-glow:  rgba(143, 211, 255, 0.24);
+      --text-primary: #edf6ff;
+      --text-muted:   #90a9ba;
+      --text-data:    #9ee6d7;
+      --lofi-pink:    #f5a6c8;
+      --lofi-gold:    #f6d58b;
+      --lofi-violet:  #b9a7ff;
+      --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-data: 'Courier New', 'Courier', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background:
+        radial-gradient(circle at 50% 48%, rgba(17, 31, 55, 0.82) 0%, rgba(5, 8, 17, 0.95) 46%, #02040b 100%),
+        var(--bg-deep);
+      color: var(--text-primary);
+      overflow: hidden;
+      font-family: var(--font-ui);
+    }
+    canvas { display: block; }
+    #space-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    /* UI Panels Shell */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      backdrop-filter: blur(22px) saturate(125%);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 28px rgba(143, 211, 255, 0.055);
+      position: absolute;
+      z-index: 10;
+    }
+
+    /* Typography */
+    .mono { font-family: var(--font-data); }
+    .accent { color: var(--accent); }
+    .small { font-size: 13px; }
+    .uppercase { text-transform: uppercase; }
+
+    /* Header */
+    #header {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 22;
+      pointer-events: none;
+    }
+    #title {
+      letter-spacing: 2px;
+    }
+
+    /* Top Right Buttons */
+    #top-right-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 24;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      max-width: min(980px, calc(100vw - 260px));
+    }
+
+    /* Bottom Panel */
+    #bottom-panel {
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 25px;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Buttons */
+    button {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-data);
+      font-size: 12px;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button:hover {
+      box-shadow: 0 0 12px var(--accent-glow);
+      border-color: var(--accent);
+    }
+    button.active {
+      background: var(--accent);
+      color: var(--bg-deep);
+      font-weight: bold;
+    }
+
+    /* Info Panel */
+    #info-panel {
+      --current-accent: var(--accent);
+      top: 20px;
+      right: 20px;
+      width: min(400px, calc(100vw - 24px));
+      bottom: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(20px);
+      transition: transform 250ms ease-out, opacity 250ms ease-out, box-shadow 250ms ease-out;
+    }
+    #info-panel.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+      box-shadow: 0 0 24px color-mix(in srgb, var(--current-accent) 25%, transparent);
+    }
+    .info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid color-mix(in srgb, var(--current-accent) 28%, var(--border));
+      padding-bottom: 14px;
+      gap: 16px;
+    }
+    .info-heading { min-width: 0; }
+    .info-title {
+      color: var(--current-accent, var(--accent));
+      font-size: 32px;
+      letter-spacing: 3px;
+      line-height: 1;
+      font-family: var(--font-data);
+      text-shadow: 0 0 18px color-mix(in srgb, var(--current-accent) 35%, transparent);
+    }
+    .info-category {
+      margin-top: 8px;
+      color: var(--text-muted);
+      font-family: var(--font-data);
+      font-size: 12px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+    .close-btn {
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+    .close-btn:hover {
+      color: var(--current-accent, var(--accent));
+      text-shadow: 0 0 12px color-mix(in srgb, var(--current-accent) 55%, transparent);
+    }
+    .info-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .info-tab {
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 10px 4px;
+      width: 100%;
+    }
+    .info-tab.active {
+      background: transparent;
+      color: var(--current-accent, var(--accent));
+      border-bottom-color: var(--current-accent, var(--accent));
+      box-shadow: 0 8px 18px -14px var(--current-accent, var(--accent));
+    }
+    .info-content {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 150ms ease, transform 200ms ease;
+    }
+    .info-content.is-switching { opacity: 0; transform: translateY(6px); }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      font-size: 14px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.045);
+    }
+    .info-label { color: var(--text-muted); }
+    .info-value { color: var(--text-data); font-family: var(--font-data); text-align: right; }
+    .info-fact {
+      margin-top: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 12px 0;
+    }
+    .story-copy {
+      position: relative;
+      padding: 22px 6px 10px 20px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--text-primary);
+    }
+    .story-copy::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 24px;
+      width: 3px;
+      height: 40px;
+      border-radius: 999px;
+      background: var(--current-accent, var(--accent));
+      box-shadow: 0 0 14px color-mix(in srgb, var(--current-accent) 45%, transparent);
+    }
+    .story-copy .story-first { color: var(--current-accent, var(--accent)); }
+
+    /* Slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+      width: 120px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      margin-top: -5px;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* Date and Speed Display */
+    .data-readout {
+      font-family: var(--font-data);
+      color: var(--text-data);
+      font-size: 14px;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-deep);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 1s ease;
+    }
+    #loading-logo {
+      font-size: 24px;
+      letter-spacing: 4px;
+      margin-bottom: 20px;
+    }
+    #loading-bar-container {
+      width: 300px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #loading-bar {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    #loading-status {
+      font-family: var(--font-data);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* True Scale Overlay */
+    #true-scale-overlay {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    /* Light Travel Counter */
+    #light-travel-counter {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-data);
+      color: var(--accent);
+      font-size: 18px;
+      display: none;
+      background: var(--bg-panel);
+      padding: 10px 20px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+    }
+
+    /* Tooltip / Help */
+    #help-btn {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border-radius: 50%;
+    }
+
+
+    /* Beyond-production upgrade: cinematic glass cockpit, onboarding, tours, search and telemetry */
+    :root {
+      --success: #66ffcc;
+      --warning: #ffd166;
+      --danger: #ff6b6b;
+      --panel-strong: rgba(5, 9, 18, 0.94);
+      --glass-highlight: rgba(255,255,255,0.08);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(143, 211, 255, 0.14), transparent 24%),
+        radial-gradient(circle at 82% 24%, rgba(245, 166, 200, 0.11), transparent 25%),
+        radial-gradient(circle at 50% 90%, rgba(246, 213, 139, 0.07), transparent 30%),
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.010) 1px, transparent 1px);
+      background-size: auto, auto, auto, 92px 92px, 92px 92px;
+      mix-blend-mode: screen;
+      animation: aurora-breathe 18s ease-in-out infinite alternate;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+      background:
+        radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.48) 100%),
+        linear-gradient(rgba(255,255,255,0.010), rgba(255,255,255,0.002) 45%, rgba(0,0,0,0.045));
+      background-size: auto, 100% 6px;
+      opacity: 0.62;
+    }
+
+
+    @keyframes aurora-breathe {
+      from { filter: hue-rotate(-7deg) brightness(0.94); transform: scale(1); }
+      to { filter: hue-rotate(7deg) brightness(1.08); transform: scale(1.018); }
+    }
+
+    #lofi-caption {
+      position: fixed;
+      left: 50%;
+      top: 22px;
+      transform: translateX(-50%);
+      z-index: 11;
+      pointer-events: none;
+      color: rgba(237,246,255,0.66);
+      font-family: var(--font-data);
+      font-size: 11px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(143,211,255,0.32);
+    }
+
+    #header {
+      padding: 10px 14px;
+      border-left: 2px solid var(--accent);
+      background: linear-gradient(90deg, rgba(79,195,247,0.12), transparent);
+      text-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    #mission-status {
+      top: 68px;
+      left: 20px;
+      width: 280px;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .status-card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    .status-label {
+      color: var(--text-muted);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-family: var(--font-data);
+    }
+
+    .status-value {
+      color: var(--text-data);
+      margin-top: 4px;
+      font-family: var(--font-data);
+      font-size: 13px;
+    }
+
+    #tour-panel {
+      left: 20px;
+      bottom: 20px;
+      width: 310px;
+      padding: 18px;
+      transform: translateY(calc(100% + 40px));
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+      opacity: 0;
+    }
+
+    #tour-panel.open {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    #tour-progress {
+      width: 100%;
+      height: 4px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+    }
+
+    #tour-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      box-shadow: 0 0 12px var(--accent-glow);
+      transition: width 0.3s ease;
+    }
+
+    #command-palette {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 11vh;
+      background: rgba(0,0,0,0.48);
+      backdrop-filter: blur(10px);
+      z-index: 80;
+    }
+
+    #command-palette.open { display: flex; }
+
+    .palette-card {
+      width: min(640px, calc(100vw - 30px));
+      overflow: hidden;
+      background: var(--panel-strong);
+      border: 1px solid rgba(79,195,247,0.32);
+      border-radius: 14px;
+      box-shadow: 0 30px 90px rgba(0,0,0,0.55), 0 0 40px rgba(79,195,247,0.14);
+    }
+
+    #palette-input {
+      width: 100%;
+      padding: 18px 20px;
+      border: 0;
+      outline: 0;
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.04);
+      font-size: 18px;
+      font-family: var(--font-ui);
+    }
+
+    #palette-results {
+      max-height: 390px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .palette-item {
+      width: 100%;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: 8px;
+      text-align: left;
+      text-transform: none;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      background: transparent;
+    }
+
+    .palette-item:hover, .palette-item.active {
+      background: rgba(79,195,247,0.13);
+      border-color: rgba(79,195,247,0.55);
+    }
+
+    .palette-kind {
+      color: var(--text-muted);
+      font-family: var(--font-data);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    #toast-stack {
+      position: fixed;
+      right: 20px;
+      bottom: 92px;
+      z-index: 75;
+      display: grid;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      width: min(360px, calc(100vw - 40px));
+      background: var(--panel-strong);
+      border: 1px solid rgba(79,195,247,0.32);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.35);
+      animation: toast-in 0.25s ease both;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #constellation-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0.55;
+    }
+
+    .range-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #bottom-panel {
+      max-width: calc(100vw - 40px);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .info-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .info-meta {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    #perf-indicator {
+      position: fixed;
+      left: 20px;
+      bottom: 124px;
+      z-index: 14;
+      color: var(--success);
+      font-family: var(--font-data);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      opacity: 0.92;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(3, 7, 18, 0.68);
+      border: 1px solid rgba(102, 255, 204, 0.18);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .language-select {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-family: var(--font-data);
+      font-size: 12px;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    .language-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .mission-badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .mission-badge {
+      border: 1px solid color-mix(in srgb, var(--current-accent) 60%, transparent);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: color-mix(in srgb, var(--current-accent) 10%, transparent);
+      color: var(--current-accent, var(--accent));
+      font-family: var(--font-data);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .meter-stack { display: grid; gap: 10px; margin-top: 14px; }
+    .meter-row {
+      display: grid;
+      grid-template-columns: 102px 1fr 36px;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-data);
+      text-transform: uppercase;
+    }
+    .meter-track { height: 7px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.09); }
+    .meter-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--current-accent, var(--accent));
+      box-shadow: 0 0 12px color-mix(in srgb, var(--current-accent) 50%, transparent);
+      width: 0%;
+    }
+
+    .timeline-list {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      margin: 14px 0 0 62px;
+      padding: 4px 0 4px 20px;
+    }
+    .timeline-list::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: color-mix(in srgb, var(--current-accent) 40%, transparent);
+    }
+    .timeline-item {
+      position: relative;
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: 0;
+      transform: translateX(-12px);
+      animation: timelineIn 260ms ease forwards;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -23px;
+      top: 5px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--current-accent, var(--accent));
+      box-shadow: 0 0 10px color-mix(in srgb, var(--current-accent) 70%, transparent);
+    }
+    .timeline-year {
+      position: absolute;
+      right: calc(100% + 34px);
+      top: 0;
+      color: var(--current-accent, var(--accent));
+      font-family: var(--font-data);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    @keyframes timelineIn { to { opacity: 1; transform: translateX(0); } }
+
+
+
+
+
+    #qol-panel {
+      left: 20px;
+      top: 382px;
+      width: min(360px, calc(100vw - 40px));
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-14px);
+      transition: opacity 220ms ease, transform 260ms ease;
+    }
+    #qol-panel.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    .qol-section {
+      border: 1px solid rgba(255,255,255,0.075);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(255,255,255,0.025);
+    }
+    .qol-section summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-family: var(--font-data);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      list-style-position: inside;
+    }
+    .qol-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .qol-row small {
+      display: block;
+      color: var(--text-muted);
+      margin-top: 3px;
+      line-height: 1.35;
+    }
+    .qol-row input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+    .qol-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    body.ui-dimmed .panel:not(#qol-panel):not(#info-panel),
+    body.ui-dimmed #header,
+    body.ui-dimmed #top-right-controls,
+    body.ui-dimmed #bottom-panel,
+    body.ui-dimmed #perf-indicator {
+      opacity: 0.38;
+      transition: opacity 240ms ease;
+    }
+    body.ui-dimmed #top-right-controls:hover,
+    body.ui-dimmed #bottom-panel:hover,
+    body.ui-dimmed .panel:hover {
+      opacity: 1;
+    }
+
+    #radio-panel {
+      right: 20px;
+      bottom: 112px;
+      width: min(360px, calc(100vw - 40px));
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(16px);
+      transition: opacity 220ms ease, transform 260ms ease;
+    }
+    #radio-panel.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .radio-controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .radio-station-select {
+      width: 100%;
+      min-width: 0;
+      background: rgba(0, 0, 0, 0.36);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-family: var(--font-data);
+      font-size: 12px;
+      outline: none;
+    }
+    .radio-station-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+    .radio-status {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .radio-volume-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .radio-source-note {
+      color: var(--text-muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 860px) {
+      #mission-status { display: none; }
+      #bottom-panel { left: 10px; right: 10px; transform: none; padding: 12px; gap: 10px; }
+      #top-right-controls { top: 12px; right: 12px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 24px); }
+      #info-panel { top: 12px; right: 12px; bottom: 12px; width: min(320px, calc(100vw - 24px)); }
+      #tour-panel { width: min(310px, calc(100vw - 24px)); left: 12px; }
+
+      #qol-panel { left: 12px; top: 96px; }
+      #radio-panel { right: 12px; bottom: 96px; }
+      #perf-indicator { display: none; }
+      #lofi-caption { display: none; }
+      button { padding: 8px 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+      body::after { display: none; }
+    }
+
+  </style>
+</head>
+<body>
+
+
+
+  <canvas id="constellation-layer" aria-hidden="true"></canvas>
+  <div id="lofi-caption">breathe with the orbits</div>
+
+  <div id="mission-status" class="panel" aria-live="polite">
+    <div class="mono accent small uppercase" data-i18n="telemetryTitle">Mission Telemetry</div>
+    <div class="status-grid">
+      <div class="status-card"><div class="status-label" data-i18n="focusLabel">Focus</div><div id="hud-focus" class="status-value">Solar barycenter</div></div>
+      <div class="status-card"><div class="status-label" data-i18n="scaleLabel">Scale</div><div id="hud-scale" class="status-value">Visual</div></div>
+      <div class="status-card"><div class="status-label" data-i18n="cameraLabel">Camera</div><div id="hud-camera" class="status-value">400u</div></div>
+      <div class="status-card"><div class="status-label" data-i18n="fpsLabel">FPS</div><div id="hud-fps" class="status-value">--</div></div>
+    </div>
+    <div class="small" style="color: var(--text-muted); line-height: 1.45;"><span data-i18n="telemetryHint">Press Ctrl/⌘ + K for instant search, tours, snapshots and camera presets.</span></div>
+  </div>
+
+  <div id="loading-screen">
+    <div id="loading-logo" class="mono accent">◉ SOLAR SYSTEM EXPLORER</div>
+    <div id="loading-status">LOADING TEXTURES...</div>
+    <div id="loading-bar-container">
+      <div id="loading-bar"></div>
+    </div>
+    <div class="small mono" style="color: var(--text-muted); margin-top: 10px;">
+      Mercury · Venus · Earth · Mars · Jupiter · Saturn · Uranus · Neptune
+    </div>
+  </div>
+
+  <div id="header" class="mono accent small">
+    SOLAR SYSTEM EXPLORER
+  </div>
+
+  <div id="top-right-controls">
+    <select id="language-select" class="language-select" aria-label="Language"><option value="en">EN</option><option value="it">IT</option><option value="es">ES</option></select>
+    <button id="tour-btn" data-i18n="tourButton">◎ TOUR</button>
+    <button id="radio-btn">♫ RADIO</button>
+    <button id="qol-btn">☰ QOL</button>
+    <button id="palette-btn">⌘K</button>
+    <button id="snapshot-btn" data-i18n="snapshotButton">📷 SNAP</button>
+    <button id="light-travel-btn" data-i18n="lightTravelButton">⚡ LIGHT TRAVEL</button>
+    <button id="true-scale-btn" data-i18n="trueScaleButton">⊞ TRUE SCALE</button>
+    <button id="fullscreen-btn">⛶</button>
+    <button id="help-btn">?</button>
+  </div>
+
+  <div id="light-travel-counter" class="mono">
+    LIGHT TRAVEL TIME: 0m 00s
+  </div>
+
+  <div id="true-scale-overlay" class="mono accent">
+    TRUE SCALE — The solar system is 99.86% empty space
+  </div>
+
+  <div id="bottom-panel" class="panel">
+    <div class="control-group">
+      <button id="orbits-btn" class="active" data-i18n="orbitsButton">ORBITS</button>
+      <button id="labels-btn" class="active" data-i18n="labelsButton">LABELS</button>
+    </div>
+
+    <div class="control-group" style="margin-left: 20px;">
+      <button id="speed-down-btn">◀◀</button>
+      <button id="play-pause-btn" data-i18n="pauseButton">❚❚ PAUSE</button>
+      <button id="speed-up-btn">▶▶</button>
+    </div>
+
+    <div class="control-group">
+      <span class="small uppercase mono" style="color: var(--text-muted);" data-i18n="speedLabel">Speed:</span>
+      <input type="range" id="speed-slider" min="0.1" max="80" step="0.1" value="1" autocomplete="off">
+      <span id="speed-display" class="data-readout">1.0x</span>
+    </div>
+
+    <div class="control-group">
+      <span class="small uppercase mono" style="color: var(--text-muted);" data-i18n="qualityLabel">Quality:</span>
+      <button id="quality-btn">AUTO</button>
+    </div>
+
+    <div class="control-group" style="margin-left: 20px;">
+      <span class="small uppercase mono" style="color: var(--text-muted);" data-i18n="dateLabel">Date:</span>
+      <span id="date-display" class="data-readout">2026-05-31</span>
+    </div>
+  </div>
+
+
+  <div id="qol-panel" class="panel" aria-live="polite">
+    <div class="info-header">
+      <div>
+        <div class="mono accent small uppercase">Comfort Menu</div>
+        <div class="radio-status">Small controls for a smoother observatory session.</div>
+      </div>
+      <button id="qol-close" aria-label="Close comfort menu">×</button>
+    </div>
+    <details class="qol-section" open>
+      <summary>Camera</summary>
+      <label class="qol-row">
+        <span>Keep following after closing info<small>Closing a planet card no longer snaps back to the Sun.</small></span>
+        <input id="qol-follow-close" type="checkbox" checked>
+      </label>
+      <label class="qol-row">
+        <span>Idle serene drift<small>When nothing is selected, the camera slowly breathes around the system.</small></span>
+        <input id="qol-serene-drift" type="checkbox" checked>
+      </label>
+      <div class="qol-actions">
+        <button id="qol-release-focus">Release focus</button>
+        <button id="qol-home-view">Home view</button>
+      </div>
+    </details>
+    <details class="qol-section">
+      <summary>View</summary>
+      <label class="qol-row">
+        <span>Dim cockpit UI<small>Let the planets breathe; hover panels to bring them back.</small></span>
+        <input id="qol-dim-ui" type="checkbox">
+      </label>
+      <div class="qol-actions">
+        <button id="qol-toggle-labels">Toggle labels</button>
+        <button id="qol-toggle-orbits">Toggle orbits</button>
+        <button id="qol-close-overlays">Close menus</button>
+      </div>
+    </details>
+  </div>
+
+
+  <div id="radio-panel" class="panel" aria-live="polite">
+    <div class="info-header">
+      <div>
+        <div class="mono accent small uppercase">Lofi Radio</div>
+        <div id="radio-now" class="radio-status">Choose a station, then press play.</div>
+      </div>
+      <button id="radio-close" aria-label="Close radio">×</button>
+    </div>
+    <div class="radio-controls">
+      <select id="radio-station" class="radio-station-select" aria-label="Radio station"></select>
+      <button id="radio-toggle">▶ PLAY</button>
+    </div>
+    <div class="radio-volume-row">
+      <span class="small uppercase mono" style="color: var(--text-muted);">Volume</span>
+      <input type="range" id="radio-volume" min="0" max="1" step="0.01" value="0.38" autocomplete="off">
+      <span id="radio-volume-display" class="data-readout">38%</span>
+    </div>
+    <div class="radio-source-note">Streams use direct station URLs and only start after you press play.</div>
+    <audio id="radio-audio" preload="none"></audio>
+  </div>
+
+
+  <div id="info-panel" class="panel">
+    <div class="info-header">
+      <div class="info-heading">
+        <div id="info-title" class="info-title uppercase">Earth</div>
+        <div id="info-category" class="info-category">Inner planet</div>
+      </div>
+      <div id="info-close" class="close-btn">&times;</div>
+    </div>
+    <div class="info-tabs" role="tablist" aria-label="Body information sections">
+      <button class="info-tab active" data-tab="data" data-i18n="tabData" role="tab" aria-selected="true">DATA</button>
+      <button class="info-tab" data-tab="story" data-i18n="tabStory" role="tab" aria-selected="false">STORY</button>
+      <button class="info-tab" data-tab="missions" data-i18n="tabMissions" role="tab" aria-selected="false">MISSIONS</button>
+    </div>
+    <div id="info-content" class="info-content"></div>
+  </div>
+
+  <div id="help-panel" class="panel" style="display: none; top: 70px; right: 20px; padding: 20px; width: 250px;">
+    <div class="info-header">
+      <div class="mono accent">COMMANDS</div>
+      <div id="help-close" class="close-btn">&times;</div>
+    </div>
+    <div class="divider"></div>
+    <div class="info-row">
+      <span class="info-label">SPACE</span>
+      <span class="info-value">PLAY / PAUSE</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">L KEY</span>
+      <span class="info-value">TOGGLE LABELS</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">O KEY</span>
+      <span class="info-value">TOGGLE ORBITS</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">F KEY</span>
+      <span class="info-value">FULLSCREEN</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">T KEY</span>
+      <span class="info-value">GUIDED TOUR</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">1-5</span>
+      <span class="info-value">CAMERA PRESETS</span>
+    </div>
+    <div class="divider"></div>
+    <div class="small" style="color: var(--text-muted);">
+      Click planets to focus and view data. Use mouse to orbit and zoom.
+    </div>
+  </div>
+
+
+
+  <div id="tour-panel" class="panel" aria-live="polite">
+    <div class="info-header">
+      <div id="tour-title" class="mono accent">Grand Tour</div>
+      <button id="tour-close" aria-label="Close tour">×</button>
+    </div>
+    <div class="divider"></div>
+    <div id="tour-copy" class="small" style="line-height: 1.55; color: var(--text-primary);">Ready for launch.</div>
+    <div id="tour-progress" style="margin: 14px 0;"><div id="tour-progress-bar"></div></div>
+    <div class="control-group" style="justify-content: space-between;">
+      <button id="tour-prev">◀ PREV</button>
+      <button id="tour-play">START</button>
+      <button id="tour-next">NEXT ▶</button>
+    </div>
+  </div>
+
+  <div id="command-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette-card">
+      <input id="palette-input" type="text" autocomplete="off" placeholder="Search planets, run commands, jump camera…" />
+      <div id="palette-results"></div>
+    </div>
+  </div>
+
+  <div id="toast-stack" aria-live="polite"></div>
+  <div id="perf-indicator">RENDER: adaptive</div>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    /**
+     * SOLAR SYSTEM EXPLORER
+     * Core Simulation Engine
+     */
+
+    // --- Configuration & Constants ---
+    const TEXTURES = {
+      sun: 'https://www.solarsystemscope.com/textures/download/2k_sun.jpg',
+      mercury: 'https://www.solarsystemscope.com/textures/download/2k_mercury.jpg',
+      venus: 'https://www.solarsystemscope.com/textures/download/2k_venus_surface.jpg',
+      earth_day: 'https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg',
+      earth_night: 'https://www.solarsystemscope.com/textures/download/2k_earth_nightmap.jpg',
+      earth_clouds: 'https://www.solarsystemscope.com/textures/download/2k_earth_clouds.jpg',
+      moon: 'https://www.solarsystemscope.com/textures/download/2k_moon.jpg',
+      mars: 'https://www.solarsystemscope.com/textures/download/2k_mars.jpg',
+      jupiter: 'https://www.solarsystemscope.com/textures/download/2k_jupiter.jpg',
+      saturn: 'https://www.solarsystemscope.com/textures/download/2k_saturn.jpg',
+      saturn_ring: 'https://www.solarsystemscope.com/textures/download/2k_saturn_ring_alpha.png',
+      uranus: 'https://www.solarsystemscope.com/textures/download/2k_uranus.jpg',
+      neptune: 'https://www.solarsystemscope.com/textures/download/2k_neptune.jpg'
+    };
+
+    const PLANET_DATA = {
+      Sun:     { diameter: "1,392,700 km", distanceFromSun: "—", dayLength: "25 days (equator)", yearLength: "~225M years (galactic orbit)", moons: 0, fact: "The Sun contains 99.86% of all the mass in the solar system." },
+      Mercury: { diameter: "4,879 km", distanceFromSun: "57.9M km", dayLength: "58.6 Earth days", yearLength: "88 Earth days", moons: 0, fact: "Surface temperatures swing from −180°C at night to 430°C in the day." },
+      Venus:   { diameter: "12,104 km", distanceFromSun: "108.2M km", dayLength: "243 Earth days", yearLength: "225 Earth days", moons: 0, fact: "Venus rotates backwards — the Sun rises in the west and sets in the east." },
+      Earth:   { diameter: "12,742 km", distanceFromSun: "149.6M km", dayLength: "24 hours", yearLength: "365.25 days", moons: 1, fact: "Earth is the only known planet with plate tectonics — it continuously recycles its crust." },
+      Mars:    { diameter: "6,779 km", distanceFromSun: "227.9M km", dayLength: "24h 37m", yearLength: "687 Earth days", moons: 2, fact: "Olympus Mons is the tallest volcano in the solar system — 21 km high, three times Everest." },
+      Jupiter: { diameter: "139,820 km", distanceFromSun: "778.5M km", dayLength: "9h 56m", yearLength: "11.86 Earth years", moons: 95, fact: "The Great Red Spot is a storm that has raged for over 350 years. It's shrinking." },
+      Saturn:  { diameter: "116,460 km", distanceFromSun: "1.43B km", dayLength: "10h 42m", yearLength: "29.46 Earth years", moons: 146, fact: "Saturn is the least dense planet in the solar system — it would float on water." },
+      Uranus:  { diameter: "50,724 km", distanceFromSun: "2.87B km", dayLength: "17h 14m", yearLength: "84 Earth years", moons: 27, fact: "Uranus rotates on its side — its axial tilt is 97.8°, likely from a giant ancient collision." },
+      Neptune: { diameter: "49,244 km", distanceFromSun: "4.5B km", dayLength: "16h 6m", yearLength: "164.8 Earth years", moons: 16, fact: "Winds on Neptune reach 2,100 km/h — the fastest in the solar system." },
+      Pluto:   { diameter: "2,377 km", distanceFromSun: "5.9B km", dayLength: "6.4 Earth days", yearLength: "248 Earth years", moons: 5, fact: "(Dwarf Planet) Pluto has a heart-shaped glacier called Tombaugh Regio, larger than France and Germany combined." },
+      Moon:    { diameter: "3,474 km", distanceFromSun: "149.6M km (with Earth)", dayLength: "27.3 days", yearLength: "27.3 days (same as rotation)", moons: 0, fact: "The Moon is slowly drifting away from Earth at 3.8 cm per year." },
+      Io:      { diameter: "3,643 km", distanceFromSun: "778.5M km (with Jupiter)", dayLength: "1.77 days", yearLength: "1.77 Earth days", moons: 0, fact: "Io is the most volcanically active body in the solar system — over 400 active volcanoes." },
+      Europa:  { diameter: "3,121 km", distanceFromSun: "778.5M km (with Jupiter)", dayLength: "3.55 days", yearLength: "3.55 Earth days", moons: 0, fact: "Europa has a global liquid water ocean beneath its icy surface — one of the best candidates for extraterrestrial life." },
+      Ganymede:{ diameter: "5,268 km", distanceFromSun: "778.5M km (with Jupiter)", dayLength: "7.15 days", yearLength: "7.15 Earth days", moons: 0, fact: "Ganymede is the largest moon in the solar system — bigger than the planet Mercury." },
+      Callisto:{ diameter: "4,820 km", distanceFromSun: "778.5M km (with Jupiter)", dayLength: "16.69 days", yearLength: "16.69 Earth days", moons: 0, fact: "Callisto has the oldest, most heavily cratered surface in the solar system." },
+      Titan:   { diameter: "5,150 km", distanceFromSun: "1.43B km (with Saturn)", dayLength: "15.95 days", yearLength: "15.95 Earth days", moons: 0, fact: "Titan has lakes and rivers — but they're filled with liquid methane, not water." },
+      Comet:   { diameter: "11 km", distanceFromSun: "Varies", dayLength: "2.2 days", yearLength: "75 years", moons: 0, fact: "Halley's Comet has been recorded by astronomers since at least 240 BC." }
+    };
+
+    const CELESTIAL_PROFILES = {
+      Sun:     { gravity: '27.9 g', temp: '5,500°C photosphere', velocity: '220 km/s galactic', mission: 'SOHO / Parker Solar Probe' },
+      Mercury: { gravity: '0.38 g', temp: '167°C mean', velocity: '47.4 km/s', mission: 'Mariner 10, 1974' },
+      Venus:   { gravity: '0.90 g', temp: '464°C mean', velocity: '35.0 km/s', mission: 'Mariner 2, 1962' },
+      Earth:   { gravity: '1.00 g', temp: '15°C mean', velocity: '29.8 km/s', mission: 'Home world' },
+      Mars:    { gravity: '0.38 g', temp: '−63°C mean', velocity: '24.1 km/s', mission: 'Mariner 4, 1965' },
+      Jupiter: { gravity: '2.53 g', temp: '−110°C cloud tops', velocity: '13.1 km/s', mission: 'Pioneer 10, 1973' },
+      Saturn:  { gravity: '1.07 g', temp: '−140°C cloud tops', velocity: '9.7 km/s', mission: 'Pioneer 11, 1979' },
+      Uranus:  { gravity: '0.89 g', temp: '−195°C cloud tops', velocity: '6.8 km/s', mission: 'Voyager 2, 1986' },
+      Neptune: { gravity: '1.14 g', temp: '−200°C cloud tops', velocity: '5.4 km/s', mission: 'Voyager 2, 1989' },
+      Pluto:   { gravity: '0.063 g', temp: '−229°C mean', velocity: '4.7 km/s', mission: 'New Horizons, 2015' },
+      Moon:    { gravity: '0.165 g', temp: '−20°C mean', velocity: '1.02 km/s around Earth', mission: 'Luna 2, 1959' },
+      Io:      { gravity: '0.18 g', temp: '−143°C mean', velocity: '17.3 km/s around Jupiter', mission: 'Pioneer 10, 1973' },
+      Europa:  { gravity: '0.13 g', temp: '−160°C mean', velocity: '13.7 km/s around Jupiter', mission: 'Pioneer 10, 1973' },
+      Ganymede:{ gravity: '0.15 g', temp: '−163°C mean', velocity: '10.9 km/s around Jupiter', mission: 'Pioneer 10, 1973' },
+      Callisto:{ gravity: '0.13 g', temp: '−139°C mean', velocity: '8.2 km/s around Jupiter', mission: 'Pioneer 10, 1973' },
+      Titan:   { gravity: '0.14 g', temp: '−179°C mean', velocity: '5.6 km/s around Saturn', mission: 'Pioneer 11, 1979' },
+      Comet:   { gravity: 'Microgravity', temp: 'Active near Sun', velocity: 'Variable', mission: 'Giotto, 1986' }
+    };
+
+    const I18N = {
+      en: {
+        languageName: 'English', loading: 'LOADING TEXTURES...', telemetryTitle: 'Mission Telemetry', focusLabel: 'Focus', scaleLabel: 'Scale', cameraLabel: 'Camera', fpsLabel: 'FPS', telemetryHint: 'Press Ctrl/⌘ + K for instant search, tours, snapshots and camera presets.',
+        tourButton: '◎ TOUR', snapshotButton: '📷 SNAP', lightTravelButton: '⚡ LIGHT TRAVEL', trueScaleButton: '⊞ TRUE SCALE', visualScaleButton: '⊟ VISUAL SCALE', lightCounter: 'LIGHT TRAVEL TIME', orbitsButton: 'ORBITS', labelsButton: 'LABELS', pauseButton: '❚❚ PAUSE', playButton: '▶ PLAY',
+        speedLabel: 'Speed:', qualityLabel: 'Quality:', dateLabel: 'Date:', diameterLabel: 'Diameter', distanceLabel: 'Distance (Sun)', dayLabel: 'Day Length', yearLabel: 'Year Length', moonsLabel: 'Moons', gravityLabel: 'Gravity', tempLabel: 'Mean Temp', velocityLabel: 'Orbital Speed', missionLabel: 'First Flyby',
+        palettePlaceholder: 'Search planets, run commands, jump camera…', noCommands: 'No matching commands.',
+        readyTour: 'Ready for launch.', tourStart: 'START', tourPause: 'PAUSE', tourPrev: '◀ PREV', tourNext: 'NEXT ▶',
+        focusCommand: name => `Focus ${name}`, cameraKind: 'camera', bodyKind: 'body', tourKind: 'tour', scienceKind: 'science', viewKind: 'view', exportKind: 'export',
+        startTourCommand: 'Start guided grand tour', lightTravelCommand: 'Visualize light travel time', trueScaleCommand: 'Toggle true astronomical scale', orbitCommand: 'Toggle orbit lines', labelCommand: 'Toggle labels', snapshotCommand: 'Download mission snapshot',
+        tracking: name => `Tracking ${name}`, targetAcquired: 'Target acquired.', cameraPreset: 'Camera preset', renderQuality: 'Render quality', qualityActive: mode => `${mode.toUpperCase()} mode active.`, snapshotExported: 'Snapshot exported', snapshotDetail: 'A PNG of the current mission view was downloaded.', snapshotBlocked: 'Snapshot blocked by browser security', snapshotBlockedDetail: 'Remote texture CORS headers can prevent canvas export. The live view is unaffected.',
+        missionUpgraded: 'Mission control upgraded', missionUpgradedDetail: 'Press Ctrl/⌘+K to search anything, start a tour, switch cameras or export a snapshot.', grandTourOn: 'Grand tour engaged', grandTourOff: 'Grand tour paused', grandTourDetail: 'Use NEXT and PREV to move through curated moments.', lightTravelTitle: 'Light travel simulation', lightTravelDetail: 'A photon wavefront is expanding from the Sun.', trueScaleOn: 'True-scale mode', trueScaleOnDetail: 'Spacing and relative radii are morphing toward astronomical scale.', trueScaleOff: 'Presentation scale', trueScaleOffDetail: 'Returning to an explorable, cinematic model.', languageToast: lang => `Language set to ${lang}.`,
+        fact: {
+          Sun: 'The Sun contains 99.86% of all the mass in the solar system.', Mercury: 'Surface temperatures swing from −180°C at night to 430°C in the day.', Venus: 'Venus rotates backwards — the Sun rises in the west and sets in the east.', Earth: 'Earth is the only known planet with plate tectonics — it continuously recycles its crust.', Mars: 'Olympus Mons is the tallest volcano in the solar system — 21 km high, three times Everest.', Jupiter: 'The Great Red Spot is a storm that has raged for over 350 years. It is shrinking.', Saturn: 'Saturn is the least dense planet in the solar system — it would float on water.', Uranus: 'Uranus rotates on its side — its axial tilt is 97.8°, likely from a giant ancient collision.', Neptune: 'Winds on Neptune reach 2,100 km/h — the fastest in the solar system.', Pluto: 'Pluto has a heart-shaped glacier called Tombaugh Regio, larger than France and Germany combined.', Moon: 'The Moon is slowly drifting away from Earth at 3.8 cm per year.', Io: 'Io is the most volcanically active body in the solar system — over 400 active volcanoes.', Europa: 'Europa has a global liquid water ocean beneath its icy surface — one of the best candidates for extraterrestrial life.', Ganymede: 'Ganymede is the largest moon in the solar system — bigger than the planet Mercury.', Callisto: 'Callisto has the oldest, most heavily cratered surface in the solar system.', Titan: 'Titan has lakes and rivers — but they are filled with liquid methane, not water.', Comet: 'Halley’s Comet has been recorded by astronomers since at least 240 BC.'
+        },
+        tourSteps: [
+          ['The engine room', '99.86% of the system mass lives here. Every orbit on screen is a negotiation with this star.'], ['The scorched messenger', 'Mercury shows how brutal sunlight becomes when there is almost no atmosphere to move heat around.'], ['The blue anomaly', 'Day, night, clouds and atmosphere are layered separately so the only known living world feels alive.'], ['A solar system within the solar system', 'Jupiter bends the asteroid belt, protects and threatens the inner worlds, and carries planet-sized moons.'], ['The ring laboratory', 'Saturn’s rings are thin, bright, young-looking structures made of countless icy fragments.'], ['A time capsule returns', 'Halley’s comet dives inward on a tilted ellipse, growing a tail only when sunlight starts sculpting it.'], ['Light is fast. Space is bigger.', 'Watch sunlight expand from the Sun and notice how long “now” takes to arrive at each world.']
+        ]
+      },
+      it: {
+        languageName: 'Italiano', loading: 'CARICAMENTO TEXTURE...', telemetryTitle: 'Telemetria missione', focusLabel: 'Fuoco', scaleLabel: 'Scala', cameraLabel: 'Camera', fpsLabel: 'FPS', telemetryHint: 'Premi Ctrl/⌘ + K per ricerca, tour, istantanee e preset camera.',
+        tourButton: '◎ TOUR', snapshotButton: '📷 SCATTO', lightTravelButton: '⚡ TEMPO LUCE', trueScaleButton: '⊞ SCALA REALE', visualScaleButton: '⊟ SCALA VISIVA', lightCounter: 'TEMPO DI VIAGGIO LUCE', orbitsButton: 'ORBITE', labelsButton: 'ETICHETTE', pauseButton: '❚❚ PAUSA', playButton: '▶ RIPRENDI',
+        speedLabel: 'Velocità:', qualityLabel: 'Qualità:', dateLabel: 'Data:', diameterLabel: 'Diametro', distanceLabel: 'Distanza (Sole)', dayLabel: 'Durata giorno', yearLabel: 'Durata anno', moonsLabel: 'Lune', gravityLabel: 'Gravità', tempLabel: 'Temp. media', velocityLabel: 'Velocità orbitale', missionLabel: 'Primo sorvolo',
+        palettePlaceholder: 'Cerca pianeti, comandi, camere…', noCommands: 'Nessun comando trovato.', readyTour: 'Pronto al lancio.', tourStart: 'AVVIA', tourPause: 'PAUSA', tourPrev: '◀ PREC', tourNext: 'AVANTI ▶',
+        focusCommand: name => `Vai a ${name}`, cameraKind: 'camera', bodyKind: 'corpo', tourKind: 'tour', scienceKind: 'scienza', viewKind: 'vista', exportKind: 'export', startTourCommand: 'Avvia il Grand Tour guidato', lightTravelCommand: 'Visualizza il tempo di viaggio della luce', trueScaleCommand: 'Attiva/disattiva la scala astronomica reale', orbitCommand: 'Mostra/nascondi orbite', labelCommand: 'Mostra/nascondi etichette', snapshotCommand: 'Scarica istantanea della missione', tracking: name => `Tracciamento ${name}`, targetAcquired: 'Bersaglio acquisito.', cameraPreset: 'Preset camera', renderQuality: 'Qualità rendering', qualityActive: mode => `Modalità ${mode.toUpperCase()} attiva.`, snapshotExported: 'Istantanea esportata', snapshotDetail: 'È stato scaricato un PNG della vista missione.', snapshotBlocked: 'Istantanea bloccata dal browser', snapshotBlockedDetail: 'Gli header CORS delle texture remote possono impedire l’esportazione. La vista live non cambia.', missionUpgraded: 'Controllo missione potenziato', missionUpgradedDetail: 'Premi Ctrl/⌘+K per cercare, avviare tour, cambiare camera o esportare uno scatto.', grandTourOn: 'Grand Tour avviato', grandTourOff: 'Grand Tour in pausa', grandTourDetail: 'Usa AVANTI e PREC per attraversare i momenti curati.', lightTravelTitle: 'Simulazione tempo luce', lightTravelDetail: 'Un fronte d’onda di fotoni si espande dal Sole.', trueScaleOn: 'Modalità scala reale', trueScaleOnDetail: 'Spaziatura e raggi relativi si trasformano verso la scala astronomica.', trueScaleOff: 'Scala di presentazione', trueScaleOffDetail: 'Ritorno a un modello esplorabile e cinematografico.', languageToast: lang => `Lingua impostata su ${lang}.`,
+        fact: { Sun: 'Il Sole contiene il 99,86% di tutta la massa del sistema solare.', Mercury: 'Le temperature superficiali oscillano da −180°C di notte a 430°C di giorno.', Venus: 'Venere ruota al contrario: il Sole sorge a ovest e tramonta a est.', Earth: 'La Terra è l’unico pianeta noto con tettonica a placche: ricicla continuamente la crosta.', Mars: 'Olympus Mons è il vulcano più alto del sistema solare: 21 km, tre volte l’Everest.', Jupiter: 'La Grande Macchia Rossa è una tempesta attiva da oltre 350 anni. Si sta restringendo.', Saturn: 'Saturno è il pianeta meno denso del sistema solare: galleggerebbe sull’acqua.', Uranus: 'Urano ruota su un fianco: la sua inclinazione assiale è 97,8°, forse per un antico impatto gigante.', Neptune: 'Su Nettuno i venti raggiungono 2.100 km/h: i più veloci del sistema solare.', Pluto: 'Plutone ha un ghiacciaio a forma di cuore, Tombaugh Regio, più grande di Francia e Germania insieme.', Moon: 'La Luna si allontana lentamente dalla Terra di 3,8 cm all’anno.', Io: 'Io è il corpo più vulcanicamente attivo del sistema solare, con oltre 400 vulcani attivi.', Europa: 'Europa nasconde un oceano globale di acqua liquida sotto il ghiaccio: è tra i migliori candidati per la vita extraterrestre.', Ganymede: 'Ganimede è la luna più grande del sistema solare: più grande del pianeta Mercurio.', Callisto: 'Callisto ha una delle superfici più antiche e craterizzate del sistema solare.', Titan: 'Titano ha laghi e fiumi, ma sono pieni di metano liquido, non acqua.', Comet: 'La cometa di Halley è registrata dagli astronomi almeno dal 240 a.C.' },
+        tourSteps: [['La sala macchine', 'Qui vive il 99,86% della massa del sistema. Ogni orbita è una negoziazione con questa stella.'], ['Il messaggero bruciato', 'Mercurio mostra quanto diventa brutale la luce solare quando quasi non c’è atmosfera a ridistribuire il calore.'], ['L’anomalia blu', 'Giorno, notte, nuvole e atmosfera sono stratificati separatamente per far respirare l’unico mondo vivente noto.'], ['Un sistema solare nel sistema solare', 'Giove piega la fascia degli asteroidi, protegge e minaccia i mondi interni e porta lune grandi come pianeti.'], ['Il laboratorio degli anelli', 'Gli anelli di Saturno sono strutture sottili, luminose e giovani, fatte di innumerevoli frammenti ghiacciati.'], ['Una capsula del tempo ritorna', 'Halley si tuffa verso l’interno su un’ellisse inclinata e sviluppa una coda quando la luce solare la scolpisce.'], ['La luce è veloce. Lo spazio è più grande.', 'Guarda la luce solare espandersi dal Sole e quanto tempo impiega “adesso” ad arrivare a ogni mondo.']]
+      },
+      es: {
+        languageName: 'Español', loading: 'CARGANDO TEXTURAS...', telemetryTitle: 'Telemetría de misión', focusLabel: 'Enfoque', scaleLabel: 'Escala', cameraLabel: 'Cámara', fpsLabel: 'FPS', telemetryHint: 'Pulsa Ctrl/⌘ + K para búsqueda, tours, capturas y cámaras.', tourButton: '◎ TOUR', snapshotButton: '📷 CAPTURA', lightTravelButton: '⚡ TIEMPO LUZ', trueScaleButton: '⊞ ESCALA REAL', visualScaleButton: '⊟ ESCALA VISUAL', lightCounter: 'TIEMPO DE VIAJE DE LA LUZ', orbitsButton: 'ÓRBITAS', labelsButton: 'ETIQUETAS', pauseButton: '❚❚ PAUSA', playButton: '▶ REANUDAR', speedLabel: 'Velocidad:', qualityLabel: 'Calidad:', dateLabel: 'Fecha:', diameterLabel: 'Diámetro', distanceLabel: 'Distancia (Sol)', dayLabel: 'Duración del día', yearLabel: 'Duración del año', moonsLabel: 'Lunas', gravityLabel: 'Gravedad', tempLabel: 'Temp. media', velocityLabel: 'Velocidad orbital', missionLabel: 'Primer sobrevuelo', palettePlaceholder: 'Busca planetas, comandos, cámaras…', noCommands: 'No hay comandos coincidentes.', readyTour: 'Listo para el lanzamiento.', tourStart: 'INICIAR', tourPause: 'PAUSA', tourPrev: '◀ ANT', tourNext: 'SIG ▶', focusCommand: name => `Enfocar ${name}`, cameraKind: 'cámara', bodyKind: 'cuerpo', tourKind: 'tour', scienceKind: 'ciencia', viewKind: 'vista', exportKind: 'exportar', startTourCommand: 'Iniciar Grand Tour guiado', lightTravelCommand: 'Visualizar el tiempo de viaje de la luz', trueScaleCommand: 'Alternar escala astronómica real', orbitCommand: 'Alternar líneas orbitales', labelCommand: 'Alternar etiquetas', snapshotCommand: 'Descargar captura de misión', tracking: name => `Siguiendo ${name}`, targetAcquired: 'Objetivo adquirido.', cameraPreset: 'Preset de cámara', renderQuality: 'Calidad de render', qualityActive: mode => `Modo ${mode.toUpperCase()} activo.`, snapshotExported: 'Captura exportada', snapshotDetail: 'Se descargó un PNG de la vista de misión.', snapshotBlocked: 'Captura bloqueada por seguridad del navegador', snapshotBlockedDetail: 'Los encabezados CORS de texturas remotas pueden impedir la exportación. La vista en vivo no se afecta.', missionUpgraded: 'Control de misión mejorado', missionUpgradedDetail: 'Pulsa Ctrl/⌘+K para buscar, iniciar tours, cambiar cámaras o exportar una captura.', grandTourOn: 'Grand Tour activado', grandTourOff: 'Grand Tour pausado', grandTourDetail: 'Usa SIG y ANT para recorrer momentos curados.', lightTravelTitle: 'Simulación de tiempo luz', lightTravelDetail: 'Un frente de onda de fotones se expande desde el Sol.', trueScaleOn: 'Modo escala real', trueScaleOnDetail: 'El espaciado y los radios relativos se transforman hacia escala astronómica.', trueScaleOff: 'Escala de presentación', trueScaleOffDetail: 'Volviendo a un modelo explorable y cinematográfico.', languageToast: lang => `Idioma cambiado a ${lang}.`, fact: { Sun: 'El Sol contiene el 99,86% de toda la masa del sistema solar.', Mercury: 'Las temperaturas superficiales van de −180°C de noche a 430°C de día.', Venus: 'Venus rota al revés: el Sol sale por el oeste y se pone por el este.', Earth: 'La Tierra es el único planeta conocido con tectónica de placas: recicla continuamente su corteza.', Mars: 'Olympus Mons es el volcán más alto del sistema solar: 21 km, tres veces el Everest.', Jupiter: 'La Gran Mancha Roja es una tormenta que lleva más de 350 años activa. Se está encogiendo.', Saturn: 'Saturno es el planeta menos denso del sistema solar: flotaría en agua.', Uranus: 'Urano rota de lado: su inclinación axial es 97,8°, probablemente por un antiguo impacto gigante.', Neptune: 'En Neptuno los vientos alcanzan 2.100 km/h: los más rápidos del sistema solar.', Pluto: 'Plutón tiene un glaciar con forma de corazón llamado Tombaugh Regio, mayor que Francia y Alemania juntas.', Moon: 'La Luna se aleja lentamente de la Tierra a 3,8 cm por año.', Io: 'Ío es el cuerpo con mayor actividad volcánica del sistema solar, con más de 400 volcanes activos.', Europa: 'Europa tiene un océano global de agua líquida bajo su hielo: uno de los mejores candidatos para vida extraterrestre.', Ganymede: 'Ganímedes es la luna más grande del sistema solar: más grande que Mercurio.', Callisto: 'Calisto tiene una de las superficies más antiguas y craterizadas del sistema solar.', Titan: 'Titán tiene lagos y ríos, pero de metano líquido, no de agua.', Comet: 'El cometa Halley ha sido registrado por astrónomos al menos desde 240 a. C.' }, tourSteps: [['La sala de máquinas', 'Aquí vive el 99,86% de la masa del sistema. Cada órbita en pantalla negocia con esta estrella.'], ['El mensajero abrasado', 'Mercurio muestra lo brutal que se vuelve la luz solar cuando casi no hay atmósfera para mover el calor.'], ['La anomalía azul', 'Día, noche, nubes y atmósfera están en capas separadas para que el único mundo vivo conocido se sienta vivo.'], ['Un sistema solar dentro del sistema solar', 'Júpiter curva el cinturón de asteroides, protege y amenaza los mundos interiores y carga lunas del tamaño de planetas.'], ['El laboratorio de anillos', 'Los anillos de Saturno son estructuras finas, brillantes y jóvenes, hechas de incontables fragmentos helados.'], ['Una cápsula del tiempo vuelve', 'Halley cae hacia el interior en una elipse inclinada y desarrolla cola cuando la luz solar la esculpe.'], ['La luz es rápida. El espacio es más grande.', 'Mira cómo la luz solar se expande desde el Sol y cuánto tarda “ahora” en llegar a cada mundo.']]
+      }
+    };
+
+
+
+    Object.assign(I18N.en, {
+      tabData: 'DATA', tabStory: 'STORY', tabMissions: 'MISSIONS', metricHabitability: 'Habitability', metricDrama: 'Drama', metricExplored: 'Explored',
+      story: {
+        Sun: `The Sun isn't a ball of fire — it's a nuclear reactor 1.4 million kilometres wide that has been burning for 4.6 billion years. Every second it fuses 600 million tonnes of hydrogen into helium. The light hitting you right now left the core 100,000 years ago, bouncing through layer after layer before finally escaping to the surface. Our star is in its middle age — quiet, stable, reliable. In five billion years it will swell into a red giant and engulf the Earth. For now, it takes care of everything.`,
+        Mercury: `Mercury is the closest planet to the Sun, but not the hottest — Venus beats it easily. The reason: Mercury has almost no atmosphere. At night the temperature drops to −180°C. During the day it climbs to 430°C. Same planet, same surface, four hundred and fifty degrees of difference between one sunrise and one sunset. It also has an oversized iron core — something enormous struck it billions of years ago and stripped away most of the mantle. What you're looking at is the survivor of an impact that would have destroyed anything smaller.`,
+        Venus: `Venus is proof that similarity can be deeply misleading. Same size as Earth, same rock type, similar distance from the Sun — but its CO₂ atmosphere has triggered a greenhouse effect so extreme that the surface sits at 465°C, hot enough to melt lead. The atmosphere presses down with ninety times the force of Earth's. The Soviets landed probes there: they survived roughly two hours before being crushed. Venus also rotates backwards, so slowly that a Venusian day is longer than a Venusian year. It is the solar system's evil twin.`,
+        Earth: `From here it doesn't look like much. From out there it's the only colour in a solar system of grey, beige, and rust. Liquid water on the surface — impossible on every other inner planet. A magnetic field that deflects the solar wind. An atmosphere calibrated so precisely that shifting it by a few percentage points would make everything impossible. We still don't know if this is a statistical miracle or the norm across 400 billion galaxies. But it's the only place we know where something looked up at the sky and wondered what was out there.`,
+        Mars: `Mars is a magnificent failure. It had oceans. It had an atmosphere. It had, perhaps, the conditions for life. Then the core cooled, the magnetic field collapsed, and the solar wind spent billions of years stripping the atmosphere away. What remains is a red desert of iron oxide, with a volcano — Olympus Mons — so large that from its summit you cannot see the crater rim, because the curvature of the planet hides it beyond the horizon. This is where we're going. Maybe not us. But someone will go, and they'll carry with them the memory of everything Mars once was.`,
+        Jupiter: `Jupiter isn't really a planet — it's a failed star. If it had been eighty times more massive it would have ignited nuclear fusion and we'd be living in a binary system. Instead it's a ball of hydrogen and helium the size of 1,300 Earths, with a storm — the Great Red Spot — that has been raging for at least 350 years and is as wide as two Earths. Jupiter also deflects most of the solar system's debris, shielding the inner planets from the worst bombardments. Its four Galilean moons, visible in this planetarium, are worlds in their own right — and one of them might harbour life.`,
+        Saturn: `If you had to pick one planet that looks impossible, it would be Saturn — not for its size, but for the rings. They're 282,000 kilometres wide but average only ten metres thick. Scaled to an A4 page, they'd be a thousand times thinner than the paper itself. Made of ice and rock, ranging from grains of sand to house-sized boulders, they're probably the remains of a moon that came too close and was torn apart. In 100 million years they may be gone — Saturn is slowly pulling them in. We're seeing them at a precise moment in its history. We're lucky.`,
+        Uranus: `Uranus rotates on its side — axial tilt of 97.8 degrees. This means the poles alternate 42 years of continuous sunlight with 42 years of total darkness. Something enormous struck it billions of years ago and essentially knocked it over. It's an ice giant: not ice as we picture it, but water, methane, and ammonia compressed at extreme pressure and temperature. It also has rings — thinner and darker than Saturn's, almost invisible from Earth. Uranus is strange, neglected by astronomers for decades, and probably still hiding something we don't understand.`,
+        Neptune: `Neptune is the planet we shouldn't have found. Astronomers predicted it mathematically before seeing it — Le Verrier calculated where it had to be based on disturbances in Uranus's orbit, and telescopes found it exactly there. It's 4.5 billion kilometres from the Sun, yet it has the fastest winds in the solar system: 2,100 km/h. It radiates more heat than it receives — there must be an internal energy source still active. Voyager 2 is the only spacecraft that's ever visited, in 1989. No one has been back.`,
+        Pluto: `For 76 years, Pluto was the ninth planet. In 2006 it was reclassified as a dwarf planet — a decision that still divides astronomers. But in 2015, New Horizons flew past and revealed something unexpected: water-ice mountains as tall as the Alps, a thin but real atmosphere, and a heart — Tombaugh Regio, a nitrogen-and-carbon-monoxide glacier shaped like a heart, larger than France and Germany combined. Pluto is alive in ways no one anticipated. The definition of planet can change. Pluto remains.`,
+        Moon: `The Moon is one reason you exist. Without it, Earth's rotational axis would be chaotic, the climate would be unpredictable across millions of years, and complex evolution would likely never have happened. It formed from an impact — a Mars-sized body struck the early Earth 4.5 billion years ago, and the debris coalesced in orbit. It was much closer then. The tides were enormous. The night sky was dominated by a disc ten times larger than what we see now. It drifts away at 3.8 centimetres per year. Apollo 11 astronauts left laser reflectors on the surface: we still use them today to measure this distance to millimetre precision.`,
+        Io: `Io is the most volcanically active body in the solar system — not because it has an intensely hot core, but because Jupiter continuously squeezes it with gravitational force, generating internal friction that heats it from within. Over 400 active volcanoes. Some eruptions reach 500 kilometres into the sky. The surface is coated in sulphur in various states — yellow, orange, red, white — and regenerates so quickly that impact craters are buried before they can be counted. Galileo observed it in 1610 with a handmade telescope. He had no idea what he was looking at.`,
+        Europa: `Beneath 10 to 30 kilometres of ice, there is an ocean. Not frozen — liquid, salty, kept warm by the same gravitational compression that keeps Io volcanic. It's in contact with a rocky seafloor, just like Earth's oceans. On Earth, in places where ocean meets rock without any sunlight, we've found entire ecosystems: bacteria, worms, crabs, fish. Europa has everything it would need. We don't know if there's life there. But the Europa Clipper spacecraft, launched in 2024, will tell us far more before 2030. It is the most probable place in the solar system to find something alive.`,
+        Ganymede: `Ganymede is larger than Mercury. If it orbited the Sun instead of Jupiter, we'd call it a planet without hesitation. It has its own magnetic field — the only moon in the solar system that does. It probably also has a subsurface ocean, deeper and vaster than Europa's but buried under a thicker layer of ice. ESA's JUICE spacecraft will arrive around 2031 and enter permanent orbit — the first time a spacecraft will orbit a moon other than our own. Galileo discovered it on January 7, 1610. In that moment, he didn't know he had just found a world larger than a planet.`,
+        Callisto: `Callisto is ancient. Its surface is the most heavily cratered in the solar system — a record of every impact over the last four billion years, with no volcanoes or plate tectonics to renew it. It's like looking at a planetary fossil. It's also the Galilean moon furthest from Jupiter, which makes it relatively sheltered from the intense radiation that hammers Io and Europa. That's why it's one of the candidates for a future human base in the Jovian system. It doesn't have the drama of Europa or the fire of Io. It has something rarer: the memory of everything that has ever happened.`,
+        Titan: `Titan has a denser atmosphere than Earth's — mostly nitrogen, with methane. It has a complete methane cycle: evaporation, clouds, rain, rivers, lakes. Everything water does on Earth, methane does on Titan — but at −179°C. The Huygens probe landed in 2005 and sent back images of smooth rounded pebbles — worn by a fluid, like riverbed stones. The Dragonfly mission will launch in 2027 to fly a drone across the surface. Titan isn't habitable for us. But it proves that the chemistry of life can work with completely different ingredients.`,
+        Comet: `Halley's Comet returns every 75 to 76 years. Julius Caesar was alive the first time it was recorded with precision. Normally it lives beyond Neptune, cold and inert. Then its orbit brings it back toward the Sun: the ice sublimates, dust is swept away by the solar wind, and a tail forms — always pointing away from the Sun, not in the direction of travel. It will return in 2061. Whoever is reading this today will be exactly the right age to see it with their own eyes. In 1986, the European probe Giotto flew close enough to photograph the nucleus: 15 kilometres long, blacker than anything else in the solar system. A frozen fragment of the original solar system, unchanged for 4.6 billion years.`
+      }
+    });
+
+    Object.assign(I18N.it, {
+      focusLabel: 'Messa a fuoco', tabData: 'DATI', tabStory: 'STORIA', tabMissions: 'MISSIONI', metricHabitability: 'Abitabilità', metricDrama: 'Meraviglia', metricExplored: 'Esplorato',
+      story: {
+        Sun: `Il Sole non è una sfera di fuoco — è un reattore nucleare da 1,4 milioni di chilometri di diametro che esiste da 4,6 miliardi di anni. Ogni secondo fonde 600 milioni di tonnellate di idrogeno in elio. La luce che ti colpisce adesso è partita dal nucleo 100.000 anni fa, rimbalzando tra gli strati prima di sfuggire in superficie. La nostra stella è nella sua età di mezzo — tranquilla, stabile, affidabile. Tra cinque miliardi di anni diventerà una gigante rossa e ingloberà la Terra. Per ora si prende cura di tutto.`,
+        Mercury: `Mercurio è il pianeta più vicino al Sole ma non il più caldo — Venere lo batte facilmente. Il motivo: non ha quasi atmosfera. Di notte la temperatura precipita a −180°C. Di giorno sale a 430°C. Lo stesso pianeta, la stessa superficie, quattrocentocinquanta gradi di differenza tra un'alba e un tramonto. Ha anche un nucleo di ferro enorme per le sue dimensioni — qualcosa lo ha colpito miliardi di anni fa e ha strappato via gran parte del mantello. Quello che vedi oggi è il sopravvissuto di un impatto che avrebbe distrutto qualsiasi cosa più piccola.`,
+        Venus: `Venere è la prova che la somiglianza può essere ingannevole. Stessa dimensione della Terra, stesso tipo di roccia, stessa distanza approssimativa dal Sole — ma la sua atmosfera di CO₂ ha creato un effetto serra così estremo che la superficie raggiunge 465°C, abbastanza da sciogliere il piombo. L'atmosfera preme con una forza 90 volte quella terrestre. I sovietici ci atterrarono con delle sonde: sopravvissero circa due ore prima di essere schiacciate. Venere ruota anche al contrario rispetto agli altri pianeti, così lentamente che un giorno venusiano è più lungo di un anno venusiano. È il gemello cattivo del sistema solare.`,
+        Earth: `Da qui non sembra niente di speciale. Da là fuori è l'unica macchia di colore in un sistema solare di grigio, beige e arancione. Acqua liquida in superficie — impossibile su ogni altro pianeta interno. Un campo magnetico che respinge il vento solare. Un'atmosfera calibrata così precisamente che basta spostarla di qualche percento per rendere tutto impossibile. Non sappiamo ancora se è un miracolo statistico o la norma in un universo da 400 miliardi di galassie. Ma è l'unico posto che conosciamo dove qualcuno ha guardato verso il cielo e si è chiesto cosa ci fosse lassù.`,
+        Mars: `Marte è un fallimento magnifico. Aveva oceani. Aveva un'atmosfera. Aveva, forse, le condizioni per la vita. Poi il nucleo si è raffreddato, il campo magnetico è scomparso, il vento solare ha eroso l'atmosfera per miliardi di anni. Quello che rimane è un deserto rosso di ossido di ferro con un vulcano — Olympus Mons — così grande che dalla cima non riesci a vedere il bordo del cratere: la curvatura del pianeta lo nasconde oltre l'orizzonte. È il posto nel sistema solare dove andremo. Forse non noi. Ma qualcuno ci andrà, e porterà con sé i segni di tutto quello che Marte era.`,
+        Jupiter: `Giove non è un pianeta — è un sistema solare mancato. Se fosse stato 80 volte più massiccio avrebbe iniziato la fusione nucleare e saremmo in un sistema binario. Invece è una palla di idrogeno ed elio grande 1.300 Terre, con una tempesta attiva — la Grande Macchia Rossa — da almeno 350 anni, larga quanto due Terre. Giove devia anche la maggior parte dei detriti del sistema solare, proteggendo i pianeti interni dai bombardamenti più devastanti. Il guardiano silenzioso. Le sue quattro lune galileiane, visibili in questo planetario, sono mondi a sé stanti — e uno di loro potrebbe ospitare vita.`,
+        Saturn: `Se dovessi scegliere un pianeta che sembra impossibile, sarebbe Saturno — non per la dimensione, ma per gli anelli. Sono larghi 282.000 chilometri ma spessi in media solo dieci metri. Se li riducessi alle proporzioni di un foglio A4, sarebbero mille volte più sottili della carta stessa. Sono fatti di ghiaccio e roccia, da granelli di sabbia a blocchi grandi quanto una casa, probabilmente i resti di una luna che si è avvicinata troppo e si è fatta a pezzi. Tra 100 milioni di anni potrebbero non esserci più — Saturno li sta lentamente attraendo verso di sé. Li vediamo in un momento preciso della sua storia. Siamo fortunati.`,
+        Uranus: `Urano ruota su un fianco — l'asse è inclinato di 97,8 gradi rispetto all'orbita. Significa che i poli alternano 42 anni di luce solare continua a 42 anni di buio assoluto. Qualcosa di enorme lo ha colpito miliardi di anni fa e lo ha praticamente rovesciato. È un gigante di ghiaccio: non ghiaccio come lo intendiamo noi, ma acqua, metano e ammoniaca in forma compressa ad altissima pressione. Ha anche gli anelli — più sottili e scuri di quelli di Saturno, praticamente invisibili da Terra. Urano è strano, dimenticato dagli astronomi per decenni, e probabilmente nasconde ancora qualcosa che non capiamo.`,
+        Neptune: `Nettuno è il pianeta che non avremmo dovuto trovare. Gli astronomi lo hanno previsto matematicamente prima di vederlo — Le Verrier ha calcolato dove doveva essere in base alle perturbazioni dell'orbita di Urano, e i telescopi lo hanno trovato esattamente lì. È a 4,5 miliardi di chilometri dal Sole, eppure ha i venti più veloci del sistema solare: 2.100 km/h. Irradia più calore di quanto ne riceva — deve avere una fonte di energia interna ancora attiva. Voyager 2 è l'unica sonda che lo ha visitato, nel 1989. Da allora nessuno ci è tornato.`,
+        Pluto: `Per 76 anni Plutone è stato il nono pianeta. Nel 2006 è stato declassato a pianeta nano — una decisione che divide ancora gli astronomi. Ma nel 2015 la sonda New Horizons ha volato sopra di lui e ha rivelato qualcosa di inaspettato: montagne di ghiaccio d'acqua alte quanto le Alpi, un'atmosfera sottile ma presente, e un cuore — Tombaugh Regio, un ghiacciaio a forma di cuore di azoto e monossido di carbonio, più grande di Francia e Germania messe insieme. Plutone è vivo in modi che nessuno si aspettava. La definizione di pianeta può cambiare. Lui rimane.`,
+        Moon: `La Luna è il motivo per cui esisti. Senza di lei la Terra avrebbe un asse di rotazione caotico, il clima sarebbe imprevedibile su scale di milioni di anni, e l'evoluzione complessa probabilmente non sarebbe mai avvenuta. Si è formata da un impatto — un corpo grande come Marte ha colpito la Terra primordiale 4,5 miliardi di anni fa, e i detriti si sono accumulati in orbita. Era molto più vicina allora. Le maree erano enormi. Il cielo di notte era dominato da un disco dieci volte più grande. Adesso si allontana di 3,8 cm all'anno. Gli astronauti dell'Apollo 11 hanno lasciato retroriflettori sulla superficie: ancora oggi li usiamo con i laser per misurare questa distanza con precisione millimetrica.`,
+        Io: `Io è il corpo più vulcanicamente attivo del sistema solare. Non perché abbia un nucleo caldissimo — ma perché Giove la strizza continuamente con la sua gravità, generando attrito interno che la scalda. Ha oltre 400 vulcani attivi. Alcune eruzioni raggiungono 500 km di altezza. La superficie è ricoperta di zolfo in varie forme — giallo, arancione, rosso, bianco — e si rigenera così velocemente che non ha quasi crateri da impatto: vengono sepolti prima di poter essere contati. Galileo la vide nel 1610 con il suo telescopio artigianale. Non poteva sapere cosa stava guardando.`,
+        Europa: `Sotto 10–30 chilometri di ghiaccio c'è un oceano. Non congelato — liquido, salato, tenuto caldo dallo stesso effetto gravitazionale che mantiene attiva Io. È in contatto con il fondale roccioso, proprio come gli oceani terrestri. Sulla Terra, in luoghi dove l'oceano tocca la roccia senza luce solare, abbiamo trovato ecosistemi interi: batteri, vermi, granchi, pesci. Europa ha tutto quello che serve. Non sappiamo se c'è vita lì. Ma la sonda Europa Clipper, lanciata nel 2024, ce lo dirà molto meglio entro il 2030. È il posto più probabile nel sistema solare dove trovare qualcosa di vivo.`,
+        Ganymede: `Ganimede è più grande di Mercurio. Se orbitasse intorno al Sole invece che a Giove, lo chiameremmo pianeta senza esitare. Ha il suo campo magnetico — l'unica luna del sistema solare ad averne uno. Probabilmente ha anche un oceano sotterraneo, più profondo e vasto di quello di Europa ma seppellito sotto uno strato di ghiaccio più spesso. La sonda JUICE dell'ESA arriverà intorno al 2031 ed entrerà in orbita permanente attorno a lui — la prima volta che una sonda orbiterà una luna che non sia la nostra. Galileo la scoprì il 7 gennaio 1610. In quel momento non sapeva di aver appena trovato un mondo più grande di un pianeta.`,
+        Callisto: `Callisto è antica. La sua superficie è la più craterizzata del sistema solare — un archivio di ogni impatto degli ultimi quattro miliardi di anni, senza vulcani né tettonica a placche che la rinnovino. È come guardare un fossile planetario. È anche la luna galileiana più lontana da Giove, il che la rende relativamente sicura dalle radiazioni intense che martellano Io ed Europa. Per questo è una delle candidate per una futura base umana nelle missioni verso il sistema gioviano. Non ha la dramma di Europa o il fuoco di Io. Ha qualcosa di più raro: la memoria di tutto ciò che è successo.`,
+        Titan: `Titano ha un'atmosfera più densa di quella terrestre — azoto principalmente, con metano. Ha un ciclo del metano completo: evaporazione, nuvole, pioggia, fiumi, laghi. Tutto quello che l'acqua fa sulla Terra, il metano lo fa su Titano — ma a −179°C. La sonda Huygens è atterrata nel 2005 e ha trasmesso immagini di ciottoli levigati da un fluido, come i sassi di un fiume. La missione Dragonfly partirà nel 2027 per volarci sopra con un drone. Titano non è abitabile per noi. Ma dimostra che la chimica della vita può funzionare con ingredienti completamente diversi da quelli che conosciamo.`,
+        Comet: `La cometa di Halley torna ogni 75–76 anni. Giulio Cesare era vivo la prima volta che la registrarono con precisione. Normalmente vive oltre Nettuno, fredda e inerte. Poi l'orbita la riporta verso il Sole: il ghiaccio sublima, la polvere viene trascinata via dal vento solare, e si forma la coda — sempre opposta al Sole, non nella direzione del moto. Tornerà nel 2061. Chi legge questo oggi avrà l'età giusta per vederla con i propri occhi. Nel 1986 la sonda europea Giotto si avvicinò abbastanza da fotografarne il nucleo: 15 chilometri di lunghezza, più scuro di qualsiasi altra cosa nel sistema solare. Un frammento primordiale congelato da 4,6 miliardi di anni.`
+      }
+    });
+
+    Object.assign(I18N.es, {
+      tabData: 'DATOS', tabStory: 'HISTORIA', tabMissions: 'MISIONES', metricHabitability: 'Habitabilidad', metricDrama: 'Asombro', metricExplored: 'Explorado',
+      story: {
+        Sun: `El Sol no es una bola de fuego — es un reactor nuclear de 1,4 millones de kilómetros de diámetro que lleva ardiendo 4.600 millones de años. Cada segundo fusiona 600 millones de toneladas de hidrógeno en helio. La luz que te alcanza ahora mismo salió del núcleo hace 100.000 años, rebotando entre capa y capa antes de escapar. Nuestra estrella está en su edad media — tranquila, estable, confiable. Dentro de cinco mil millones de años se convertirá en una gigante roja y engullirá la Tierra. Por ahora, cuida de todo.`,
+        Mercury: `Mercurio es el planeta más cercano al Sol, pero no el más caliente — Venus lo supera con facilidad. El motivo: casi no tiene atmósfera. De noche la temperatura cae a −180°C. De día sube a 430°C. El mismo planeta, la misma superficie, cuatrocientos cincuenta grados de diferencia entre un amanecer y otro. Tiene también un núcleo de hierro enorme para su tamaño — algo lo golpeó hace miles de millones de años y arrancó gran parte del manto. Lo que ves hoy es el superviviente de un impacto que habría destruido cualquier cosa más pequeña.`,
+        Venus: `Venus demuestra que el parecido puede ser muy engañoso. Mismo tamaño que la Tierra, mismo tipo de roca, distancia similar al Sol — pero su atmósfera de CO₂ ha creado un efecto invernadero tan extremo que la superficie alcanza 465°C, suficiente para fundir el plomo. La atmósfera presiona con una fuerza noventa veces la terrestre. Los soviéticos aterrizaron sondas allí: sobrevivieron unas dos horas antes de ser aplastadas. Venus también rota al revés, tan lentamente que un día venusiano dura más que un año venusiano. Es el gemelo malvado del sistema solar.`,
+        Earth: `Desde aquí no parece nada especial. Desde allá fuera es la única mancha de color en un sistema solar de gris, beige y naranja. Agua líquida en la superficie — imposible en cualquier otro planeta interior. Un campo magnético que desvía el viento solar. Una atmósfera calibrada con tanta precisión que desplazarla unos pocos puntos porcentuales lo haría todo imposible. Todavía no sabemos si esto es un milagro estadístico o la norma en un universo de 400 mil millones de galaxias. Pero es el único lugar que conocemos donde algo miró al cielo y se preguntó qué había ahí fuera.`,
+        Mars: `Marte es un fracaso magnífico. Tuvo océanos. Tuvo atmósfera. Tuvo, quizás, las condiciones para la vida. Luego el núcleo se enfrió, el campo magnético desapareció y el viento solar erosionó la atmósfera durante miles de millones de años. Lo que queda es un desierto rojo de óxido de hierro con un volcán — Olympus Mons — tan grande que desde su cima no puedes ver el borde del cráter: la curvatura del planeta lo esconde más allá del horizonte. Es el lugar del sistema solar al que iremos. Quizás no nosotros. Pero alguien irá.`,
+        Jupiter: `Júpiter no es realmente un planeta — es una estrella fallida. Si hubiera sido ochenta veces más masivo habría iniciado la fusión nuclear y viviríamos en un sistema binario. En cambio es una bola de hidrógeno y helio del tamaño de 1.300 Tierras, con una tormenta — la Gran Mancha Roja — activa desde hace al menos 350 años y tan ancha como dos Tierras. Júpiter también desvía la mayor parte de los escombros del sistema solar, protegiendo los planetas interiores de los bombardeos más devastadores. Sus cuatro lunas galileanas, visibles en este planetario, son mundos por derecho propio.`,
+        Saturn: `Si tuvieras que elegir un planeta que parece imposible, sería Saturno — no por su tamaño, sino por los anillos. Tienen 282.000 kilómetros de ancho pero solo diez metros de grosor en promedio. Escalados a un folio A4, serían mil veces más delgados que el papel. Hechos de hielo y roca, desde granos de arena hasta bloques del tamaño de una casa, son probablemente los restos de una luna que se acercó demasiado y fue destrozada. En 100 millones de años podrían haber desaparecido — Saturno los atrae lentamente hacia sí. Los estamos viendo en un momento preciso de su historia.`,
+        Uranus: `Urano gira de lado — su eje está inclinado 97,8 grados respecto a su órbita. Esto significa que los polos alternan 42 años de luz solar continua con 42 años de oscuridad total. Algo enorme lo golpeó hace miles de millones de años y básicamente lo tumbó. Es un gigante de hielo: no hielo como lo imaginamos, sino agua, metano y amoníaco comprimidos a altísima presión y temperatura. También tiene anillos — más delgados y oscuros que los de Saturno, casi invisibles desde la Tierra. Urano es extraño, ignorado por los astrónomos durante décadas, y probablemente aún esconde algo que no entendemos.`,
+        Neptune: `Neptuno es el planeta que no deberíamos haber encontrado. Los astrónomos lo predijeron matemáticamente antes de verlo — Le Verrier calculó dónde tenía que estar basándose en las perturbaciones de la órbita de Urano, y los telescopios lo encontraron exactamente allí. Está a 4.500 millones de kilómetros del Sol, y sin embargo tiene los vientos más rápidos del sistema solar: 2.100 km/h. Irradia más calor del que recibe — debe haber una fuente de energía interna todavía activa. La Voyager 2 es la única sonda que lo ha visitado, en 1989. Nadie ha vuelto desde entonces.`,
+        Pluto: `Durante 76 años, Plutón fue el noveno planeta. En 2006 fue reclasificado como planeta enano — una decisión que aún divide a los astrónomos. Pero en 2015, la sonda New Horizons sobrevoló su superficie y reveló algo inesperado: montañas de hielo de agua tan altas como los Alpes, una atmósfera delgada pero real, y un corazón — Tombaugh Regio, un glaciar en forma de corazón de nitrógeno y monóxido de carbono, más grande que Francia y Alemania juntas. Plutón está vivo de formas que nadie esperaba. La definición de planeta puede cambiar. Él permanece.`,
+        Moon: `La Luna es una de las razones por las que existes. Sin ella, el eje de rotación de la Tierra sería caótico, el clima sería impredecible a escala de millones de años, y la evolución compleja probablemente nunca habría ocurrido. Se formó a partir de un impacto — un cuerpo del tamaño de Marte golpeó la Tierra primitiva hace 4.500 millones de años, y los escombros se acumularon en órbita. Estaba mucho más cerca entonces. Las mareas eran enormes. El cielo nocturno estaba dominado por un disco diez veces más grande que el actual. Se aleja 3,8 centímetros al año. Los astronautas del Apollo 11 dejaron reflectores láser en la superficie: todavía los usamos para medir esa distancia con precisión milimétrica.`,
+        Io: `Ío es el cuerpo más volcánicamente activo del sistema solar — no porque tenga un núcleo extremadamente caliente, sino porque Júpiter la comprime continuamente con su gravedad, generando fricción interna que la calienta desde dentro. Más de 400 volcanes activos. Algunas erupciones alcanzan 500 kilómetros de altura. La superficie está cubierta de azufre en varias formas — amarillo, naranja, rojo, blanco — y se regenera tan rápido que casi no tiene cráteres de impacto: quedan enterrados antes de poder contarse. Galileo la observó en 1610 con un telescopio artesanal. No podía saber lo que estaba mirando.`,
+        Europa: `Bajo 10 a 30 kilómetros de hielo hay un océano. No congelado — líquido, salado, mantenido caliente por la misma compresión gravitacional que mantiene volcánica a Ío. Está en contacto con el fondo rocoso, igual que los océanos terrestres. En la Tierra, en lugares donde el océano toca la roca sin luz solar, hemos encontrado ecosistemas enteros: bacterias, gusanos, cangrejos, peces. Europa tiene todo lo necesario. No sabemos si hay vida allí. Pero la sonda Europa Clipper, lanzada en 2024, nos dirá mucho más antes de 2030. Es el lugar más probable del sistema solar para encontrar algo vivo.`,
+        Ganymede: `Ganímedes es más grande que Mercurio. Si orbitara el Sol en lugar de Júpiter, lo llamaríamos planeta sin dudarlo. Tiene su propio campo magnético — la única luna del sistema solar que lo tiene. Probablemente también tiene un océano subterráneo, más profundo y vasto que el de Europa pero enterrado bajo una capa de hielo más gruesa. La sonda JUICE de la ESA llegará alrededor de 2031 y entrará en órbita permanente — la primera vez que una sonda orbitará una luna que no sea la nuestra. Galileo la descubrió el 7 de enero de 1610. En ese momento no sabía que acababa de encontrar un mundo más grande que un planeta.`,
+        Callisto: `Calisto es antigua. Su superficie es la más craterizada del sistema solar — un registro de cada impacto de los últimos cuatro mil millones de años, sin volcanes ni tectónica de placas que la renueven. Es como mirar un fósil planetario. También es la luna galileana más alejada de Júpiter, lo que la hace relativamente a salvo de la intensa radiación que azota a Ío y Europa. Por eso es una de las candidatas para una futura base humana en misiones al sistema joviano. No tiene el drama de Europa ni el fuego de Ío. Tiene algo más raro: la memoria de todo lo que ha sucedido.`,
+        Titan: `Titán tiene una atmósfera más densa que la de la Tierra — principalmente nitrógeno, con metano. Tiene un ciclo completo del metano: evaporación, nubes, lluvia, ríos, lagos. Todo lo que el agua hace en la Tierra, el metano lo hace en Titán — pero a −179°C. La sonda Huygens aterrizó en 2005 y envió imágenes de guijarros redondeados por un fluido, como piedras de río. La misión Dragonfly lanzará en 2027 un dron para sobrevolar la superficie. Titán no es habitable para nosotros. Pero demuestra que la química de la vida puede funcionar con ingredientes completamente distintos.`,
+        Comet: `El cometa Halley regresa cada 75-76 años. Julio César estaba vivo la primera vez que se registró con precisión. Normalmente vive más allá de Neptuno, frío e inerte. Luego su órbita lo trae de vuelta hacia el Sol: el hielo se sublima, el polvo es arrastrado por el viento solar, y se forma una cola — siempre apuntando en dirección contraria al Sol. Volverá en 2061. Quien lea esto hoy tendrá exactamente la edad adecuada para verlo con sus propios ojos. En 1986, la sonda europea Giotto se acercó lo suficiente para fotografiar el núcleo: 15 kilómetros de largo, más oscuro que cualquier otra cosa en el sistema solar. Un fragmento primitivo congelado durante 4.600 millones de años.`
+      }
+    });
+    const BODY_INTEL = {
+      Sun: { habitability: 0, drama: 100, explored: 88, badges: ['Fusion engine', 'Solar wind', 'Parker record'], timeline: [['1995', 'SOHO begins continuous solar monitoring'], ['2018', 'Parker Solar Probe launches']] },
+      Mercury: { habitability: 2, drama: 74, explored: 55, badges: ['Iron core', 'No seasons', 'Terminator zone'], timeline: [['1974', 'Mariner 10 first flyby'], ['2011', 'MESSENGER enters orbit']] },
+      Venus: { habitability: 1, drama: 92, explored: 70, badges: ['Runaway greenhouse', 'Retrograde spin', 'Crushing air'], timeline: [['1962', 'Mariner 2 first successful planetary flyby'], ['1970', 'Venera 7 lands']] },
+      Earth: { habitability: 100, drama: 82, explored: 98, badges: ['Liquid oceans', 'Magnetosphere', 'Biosphere'], timeline: [['1957', 'Sputnik opens the space age'], ['1968', 'Apollo 8 photographs Earthrise']] },
+      Mars: { habitability: 32, drama: 88, explored: 86, badges: ['Ancient rivers', 'Dust storms', 'Human target'], timeline: [['1965', 'Mariner 4 first flyby'], ['2021', 'Perseverance lands with Ingenuity']] },
+      Jupiter: { habitability: 0, drama: 96, explored: 78, badges: ['Great Red Spot', 'Radiation belts', 'Moon system'], timeline: [['1973', 'Pioneer 10 flyby'], ['2016', 'Juno enters polar orbit']] },
+      Saturn: { habitability: 0, drama: 97, explored: 80, badges: ['Icy rings', 'Hexagon storm', 'Titan gateway'], timeline: [['1979', 'Pioneer 11 flyby'], ['2004', 'Cassini arrives']] },
+      Uranus: { habitability: 0, drama: 81, explored: 28, badges: ['Sideways world', 'Ice giant', 'Dark rings'], timeline: [['1781', 'Discovered by William Herschel'], ['1986', 'Voyager 2 flyby']] },
+      Neptune: { habitability: 0, drama: 84, explored: 25, badges: ['Supersonic winds', 'Ice giant', 'Triton'], timeline: [['1846', 'Predicted then observed'], ['1989', 'Voyager 2 flyby']] },
+      Pluto: { habitability: 4, drama: 76, explored: 35, badges: ['Dwarf planet', 'Nitrogen ice', 'Kuiper Belt'], timeline: [['1930', 'Discovered by Clyde Tombaugh'], ['2015', 'New Horizons flyby']] },
+      Moon: { habitability: 6, drama: 68, explored: 95, badges: ['Tidal partner', 'Apollo sites', 'Polar ice'], timeline: [['1959', 'Luna 2 impacts'], ['1969', 'Apollo 11 lands humans']] },
+      Io: { habitability: 0, drama: 89, explored: 42, badges: ['Volcano moon', 'Sulfur frost', 'Tidal heating'], timeline: [['1610', 'Observed by Galileo'], ['1979', 'Voyager sees active volcanism']] },
+      Europa: { habitability: 62, drama: 83, explored: 44, badges: ['Subsurface ocean', 'Ice shell', 'Astrobiology'], timeline: [['1610', 'Observed by Galileo'], ['2024', 'Europa Clipper launched']] },
+      Ganymede: { habitability: 18, drama: 70, explored: 40, badges: ['Largest moon', 'Magnetic field', 'Icy ocean'], timeline: [['1610', 'Observed by Galileo'], ['2031', 'JUICE planned arrival']] },
+      Callisto: { habitability: 10, drama: 58, explored: 35, badges: ['Ancient crust', 'Impact archive', 'Low radiation'], timeline: [['1610', 'Observed by Galileo'], ['1979', 'Voyager flyby']] },
+      Titan: { habitability: 45, drama: 91, explored: 62, badges: ['Methane lakes', 'Thick air', 'Dragonfly target'], timeline: [['1655', 'Discovered by Huygens'], ['2005', 'Huygens lands']] },
+      Comet: { habitability: 0, drama: 73, explored: 50, badges: ['Ancient ice', 'Dust tail', '75-year orbit'], timeline: [['240 BC', 'Earliest recorded observations'], ['1986', 'Giotto images Halley']] }
+    };
+
+
+
+    const PLANET_COLORS = {
+      Sun:      '#FFB800',
+      Mercury:  '#B8AA96',
+      Venus:    '#F2C078',
+      Earth:    '#74B8FF',
+      Mars:     '#D96F4E',
+      Jupiter:  '#D8B28A',
+      Saturn:   '#E9D3A3',
+      Uranus:   '#7DE8E8',
+      Neptune:  '#4070DD',
+      Pluto:    '#B99B83',
+      Moon:     '#C8C8C8',
+      Io:       '#E8C040',
+      Europa:   '#A8C8E8',
+      Ganymede: '#9090A8',
+      Callisto: '#706858',
+      Titan:    '#D4A055',
+      Comet:    '#AEEFFF',
+    };
+
+    const BODY_CATEGORY = {
+      en: {
+        Sun: 'Star', Mercury: 'Inner planet', Venus: 'Inner planet', Earth: 'Inner planet',
+        Mars: 'Inner planet', Jupiter: 'Gas giant', Saturn: 'Gas giant', Uranus: 'Ice giant',
+        Neptune: 'Ice giant', Pluto: 'Dwarf planet', Moon: "Earth's moon",
+        Io: 'Galilean moon', Europa: 'Galilean moon', Ganymede: 'Galilean moon',
+        Callisto: 'Galilean moon', Titan: "Saturn's moon", Comet: 'Short-period comet'
+      },
+      it: {
+        Sun: 'Stella', Mercury: 'Pianeta interno', Venus: 'Pianeta interno', Earth: 'Pianeta interno',
+        Mars: 'Pianeta interno', Jupiter: 'Gigante gassoso', Saturn: 'Gigante gassoso', Uranus: 'Gigante ghiacciato',
+        Neptune: 'Gigante ghiacciato', Pluto: 'Pianeta nano', Moon: 'Luna della Terra',
+        Io: 'Luna galileiana', Europa: 'Luna galileiana', Ganymede: 'Luna galileiana',
+        Callisto: 'Luna galileiana', Titan: 'Luna di Saturno', Comet: 'Cometa a periodo corto'
+      },
+      es: {
+        Sun: 'Estrella', Mercury: 'Planeta interior', Venus: 'Planeta interior', Earth: 'Planeta interior',
+        Mars: 'Planeta interior', Jupiter: 'Gigante gaseoso', Saturn: 'Gigante gaseoso', Uranus: 'Gigante helado',
+        Neptune: 'Gigante helado', Pluto: 'Planeta enano', Moon: 'Luna de la Tierra',
+        Io: 'Luna galileana', Europa: 'Luna galileana', Ganymede: 'Luna galileana',
+        Callisto: 'Luna galileana', Titan: 'Luna de Saturno', Comet: 'Cometa de período corto'
+      }
+    };
+
+    const LOCALIZED_TIMELINES = {
+      it: {
+        Sun: ['Il SOHO inizia il monitoraggio solare continuo', 'La sonda Parker Solar Probe viene lanciata'],
+        Mercury: ['Mariner 10 — primo sorvolo', 'MESSENGER entra in orbita'],
+        Venus: ['Mariner 2 — primo sorvolo planetario riuscito', 'Venera 7 atterra'],
+        Earth: ["Lo Sputnik apre l'era spaziale", 'Apollo 8 fotografa il sorgere della Terra'],
+        Mars: ['Mariner 4 — primo sorvolo', 'Perseverance atterra con Ingenuity'],
+        Jupiter: ['Pioneer 10 — sorvolo', "Juno entra in orbita polare"],
+        Saturn: ['Pioneer 11 — sorvolo', 'Cassini arriva'],
+        Uranus: ['Scoperto da William Herschel', 'Voyager 2 — sorvolo'],
+        Neptune: ['Previsto, poi osservato', 'Voyager 2 — sorvolo'],
+        Pluto: ['Scoperto da Clyde Tombaugh', 'New Horizons — sorvolo'],
+        Moon: ['Luna 2 — primo impatto', 'Apollo 11 — primo allunaggio umano'],
+        Io: ['Osservata da Galileo', 'Voyager 1 scopre il vulcanismo attivo'],
+        Europa: ['Osservata da Galileo', 'Europa Clipper — lancio'],
+        Ganymede: ['Osservata da Galileo', 'JUICE — arrivo previsto'],
+        Callisto: ['Osservata da Galileo', 'Voyager 2 — sorvolo'],
+        Titan: ['Scoperta da Huygens', 'Huygens atterra'],
+        Comet: ['Prime registrazioni accurate', 'Giotto fotografa il nucleo']
+      },
+      es: {
+        Sun: ['SOHO inicia el monitoreo solar continuo', 'Lanzamiento de Parker Solar Probe'],
+        Mercury: ['Mariner 10 — primer sobrevuelo', 'MESSENGER entra en órbita'],
+        Venus: ['Mariner 2 — primer sobrevuelo planetario exitoso', 'Venera 7 aterriza'],
+        Earth: ['Sputnik abre la era espacial', 'Apollo 8 fotografía la salida de la Tierra'],
+        Mars: ['Mariner 4 — primer sobrevuelo', 'Perseverance aterriza con Ingenuity'],
+        Jupiter: ['Pioneer 10 — sobrevuelo', 'Juno entra en órbita polar'],
+        Saturn: ['Pioneer 11 — sobrevuelo', 'Cassini llega'],
+        Uranus: ['Descubierto por William Herschel', 'Voyager 2 — sobrevuelo'],
+        Neptune: ['Predicho y luego observado', 'Voyager 2 — sobrevuelo'],
+        Pluto: ['Descubierto por Clyde Tombaugh', 'New Horizons — sobrevuelo'],
+        Moon: ['Luna 2 — primer impacto', 'Apollo 11 — primer alunizaje humano'],
+        Io: ['Observada por Galileo', 'Voyager 1 descubre volcanismo activo'],
+        Europa: ['Observada por Galileo', 'Europa Clipper — lanzamiento'],
+        Ganymede: ['Observada por Galileo', 'JUICE — llegada prevista'],
+        Callisto: ['Observada por Galileo', 'Voyager 2 — sobrevuelo'],
+        Titan: ['Descubierta por Huygens', 'Huygens aterriza'],
+        Comet: ['Primeros registros precisos', 'Giotto fotografía el núcleo']
+      }
+    };
+
+    let currentLanguage = localStorage.getItem('solar-explorer-language') || 'en';
+    if (!I18N[currentLanguage]) currentLanguage = 'en';
+    const t = key => I18N[currentLanguage][key] ?? I18N.en[key] ?? key;
+
+    // --- Three.js Setup ---
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 20000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.domElement.id = 'space-canvas';
+    renderer.domElement.setAttribute('aria-label', 'Relaxing animated solar system scene');
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.92;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.035;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.055;
+    controls.minDistance = 5;
+    controls.maxDistance = 10000;
+
+    camera.position.set(0, 150, 400);
+    controls.update();
+
+    // --- Texture Assets ---
+    // Start with procedural fallbacks so the scene is never black, then upgrade to
+    // Solar System Scope maps when the browser allows them. Keep crossOrigin
+    // undefined: forcing "anonymous" sends an Origin header that this CDN does
+    // not answer with Access-Control-Allow-Origin.
+    const loadedTextures = {};
+    const textureSubscribers = {};
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.setCrossOrigin(undefined);
+
+    let loadingFinished = false;
+    function finishLoading() {
+      if (loadingFinished) return;
+      loadingFinished = true;
+      document.getElementById('loading-bar').style.width = '100%';
+      setTimeout(() => {
+        document.getElementById('loading-screen').style.opacity = '0';
+        setTimeout(() => {
+          document.getElementById('loading-screen').style.display = 'none';
+        }, 700);
+      }, 180);
+    }
+
+    function seededNoise(seed) {
+      let value = seed % 2147483647;
+      return () => {
+        value = value * 16807 % 2147483647;
+        return (value - 1) / 2147483646;
+      };
+    }
+
+    function configureTexture(texture) {
+      texture.encoding = THREE.sRGBEncoding;
+      texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    function makeCanvasTexture(width, height, painter) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      painter(ctx, width, height);
+      return configureTexture(new THREE.CanvasTexture(canvas));
+    }
+
+    function subscribeTexture(key, apply) {
+      if (!textureSubscribers[key]) textureSubscribers[key] = [];
+      textureSubscribers[key].push(apply);
+      if (loadedTextures[key]) apply(loadedTextures[key]);
+    }
+
+    function bindTextureToMaterial(material, key, property = 'map') {
+      subscribeTexture(key, texture => {
+        material[property] = texture;
+        material.needsUpdate = true;
+      });
+    }
+
+    function bindTextureToUniform(uniform, key) {
+      subscribeTexture(key, texture => { uniform.value = texture; });
+    }
+
+    function notifyTextureReady(key) {
+      (textureSubscribers[key] || []).forEach(apply => apply(loadedTextures[key]));
+    }
+
+    function loadRemoteTextures() {
+      Object.entries(TEXTURES).forEach(([key, url]) => {
+        textureLoader.load(url, texture => {
+          loadedTextures[key] = configureTexture(texture);
+          notifyTextureReady(key);
+        }, undefined, () => {
+          // Procedural fallback remains active; remote maps are an optional upgrade.
+        });
+      });
+    }
+
+    function paintNoisePlanet(ctx, width, height, base, accent, seed, bands = 0) {
+      const random = seededNoise(seed);
+      const gradient = ctx.createRadialGradient(width * 0.42, height * 0.38, 10, width * 0.5, height * 0.5, width * 0.68);
+      gradient.addColorStop(0, accent);
+      gradient.addColorStop(0.55, base);
+      gradient.addColorStop(1, '#11131a');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      if (bands) {
+        for (let y = 0; y < height; y += Math.max(5, height / bands)) {
+          ctx.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.10)' : 'rgba(50,20,10,0.11)';
+          ctx.fillRect(0, y + random() * 8, width, 2 + random() * 9);
+        }
+      }
+      for (let i = 0; i < 1800; i++) {
+        const alpha = 0.035 + random() * 0.12;
+        ctx.fillStyle = random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(random() * width, random() * height, 0.4 + random() * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function createProceduralTextures() {
+      loadedTextures.sun = makeCanvasTexture(768, 384, (ctx, w, h) => {
+        const random = seededNoise(101);
+        const grad = ctx.createRadialGradient(w * 0.5, h * 0.5, 0, w * 0.5, h * 0.5, w * 0.65);
+        grad.addColorStop(0, '#fff4b8');
+        grad.addColorStop(0.42, '#ffb347');
+        grad.addColorStop(1, '#9f3d10');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < 900; i++) {
+          ctx.strokeStyle = `rgba(255, ${120 + random() * 100}, 35, ${0.05 + random() * 0.2})`;
+          ctx.lineWidth = 1 + random() * 2;
+          ctx.beginPath();
+          const y = random() * h;
+          ctx.moveTo(0, y);
+          ctx.bezierCurveTo(w * 0.25, y + random() * 40 - 20, w * 0.75, y + random() * 40 - 20, w, y + random() * 20 - 10);
+          ctx.stroke();
+        }
+      });
+      loadedTextures.mercury = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#8d8377', '#c7baa5', 201));
+      loadedTextures.venus = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#c98945', '#f4d08c', 202, 18));
+      loadedTextures.mars = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#9f432b', '#df8a5c', 203, 10));
+      loadedTextures.moon = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#868681', '#d0cec4', 204));
+      loadedTextures.jupiter = makeCanvasTexture(768, 384, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#b98255', '#ead1ad', 205, 42));
+      loadedTextures.saturn = makeCanvasTexture(768, 384, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#b89a63', '#f0ddb4', 206, 36));
+      loadedTextures.uranus = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#78cbd0', '#c5ffff', 207, 8));
+      loadedTextures.neptune = makeCanvasTexture(512, 256, (ctx, w, h) => paintNoisePlanet(ctx, w, h, '#244da8', '#6d8cff', 208, 12));
+
+      loadedTextures.earth_day = makeCanvasTexture(768, 384, (ctx, w, h) => {
+        ctx.fillStyle = '#1e5fa8';
+        ctx.fillRect(0, 0, w, h);
+        const random = seededNoise(301);
+        ctx.fillStyle = '#4fa25d';
+        for (let i = 0; i < 28; i++) {
+          const x = random() * w;
+          const y = random() * h;
+          ctx.beginPath();
+          for (let a = 0; a < Math.PI * 2; a += 0.32) {
+            const r = (18 + random() * 58) * (0.7 + Math.sin(a * 3 + i) * 0.25);
+            const px = x + Math.cos(a) * r * (1.2 + random());
+            const py = y + Math.sin(a) * r * (0.45 + random() * 0.55);
+            a ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.fillRect(0, 0, w, h * 0.08);
+        ctx.fillRect(0, h * 0.92, w, h * 0.08);
+      });
+      loadedTextures.earth_night = makeCanvasTexture(768, 384, (ctx, w, h) => {
+        ctx.fillStyle = '#061427';
+        ctx.fillRect(0, 0, w, h);
+        const random = seededNoise(302);
+        for (let i = 0; i < 420; i++) {
+          ctx.fillStyle = `rgba(255,210,120,${0.25 + random() * 0.55})`;
+          ctx.fillRect(random() * w, random() * h, 1 + random() * 2, 1 + random() * 2);
+        }
+      });
+      loadedTextures.earth_clouds = makeCanvasTexture(768, 384, (ctx, w, h) => {
+        ctx.clearRect(0, 0, w, h);
+        const random = seededNoise(303);
+        for (let i = 0; i < 140; i++) {
+          const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+          gradient.addColorStop(0, 'rgba(255,255,255,0.45)');
+          gradient.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.save();
+          ctx.translate(random() * w, random() * h);
+          ctx.scale(18 + random() * 55, 3 + random() * 10);
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(0, 0, 1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      });
+      loadedTextures.saturn_ring = makeCanvasTexture(512, 32, (ctx, w, h) => {
+        const grad = ctx.createLinearGradient(0, 0, w, 0);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.18, 'rgba(220,190,135,0.34)');
+        grad.addColorStop(0.34, 'rgba(255,238,190,0.78)');
+        grad.addColorStop(0.50, 'rgba(80,65,55,0.08)');
+        grad.addColorStop(0.72, 'rgba(235,210,160,0.62)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+      });
+      finishLoading();
+    }
+
+    createProceduralTextures();
+    loadRemoteTextures();
+
+    // --- Starfield Implementation ---
+    function createStarfield() {
+      const starGeometry = new THREE.BufferGeometry();
+      const starMaterial = new THREE.PointsMaterial({
+        sizeAttenuation: true,
+        vertexColors: true,
+        transparent: true
+      });
+
+      const starVertices = [];
+      const starColors = [];
+      const starSizes = [];
+
+      for (let i = 0; i < 12000; i++) {
+        const x = (Math.random() - 0.5) * 16000;
+        const y = (Math.random() - 0.5) * 16000;
+        const z = (Math.random() - 0.5) * 16000;
+
+        // Ensure stars are on a large sphere
+        const d = Math.sqrt(x*x + y*y + z*z);
+        if (d < 6000) {
+          i--;
+          continue;
+        }
+
+        starVertices.push(x, y, z);
+
+        // Magnitude distribution: 60% small, 30% medium, 10% large
+        const rand = Math.random();
+        let size = 0.5;
+        if (rand > 0.6 && rand <= 0.9) size = 1.0;
+        else if (rand > 0.9) size = 1.5 + Math.random() * 0.5;
+
+        // Color distribution: 92% white, 5% warm, 3% blue-white
+        const colorRand = Math.random();
+        const color = new THREE.Color();
+        if (colorRand < 0.92) color.setHex(0xffffff);
+        else if (colorRand < 0.97) color.setHex(0xfff8e0);
+        else color.setHex(0xe0f0ff);
+
+        starColors.push(color.r, color.g, color.b);
+      }
+
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+
+      const stars = new THREE.Points(starGeometry, starMaterial);
+      scene.add(stars);
+    }
+
+    createStarfield();
+
+    // --- Scene Objects ---
+    const bodies = {}; // Store all planetary bodies
+    const orbitGroup = new THREE.Group();
+    scene.add(orbitGroup);
+
+    // Light
+    const sunLight = new THREE.PointLight(0xfff1c2, 1.85, 0, 0); // No decay for better visual
+    scene.add(sunLight);
+    scene.add(new THREE.AmbientLight(0x31445c, 0.42));
+
+    // Sun
+    const sunGeometry = new THREE.SphereGeometry(12, 64, 64);
+    const sunMaterial = new THREE.MeshBasicMaterial({
+      map: loadedTextures.sun,
+      color: 0xFDB813
+    });
+    bindTextureToMaterial(sunMaterial, 'sun');
+    const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+    scene.add(sun);
+    bodies['Sun'] = sun;
+    sun.userData = { name: 'Sun', radius: 12, type: 'star' };
+
+    // Sun Glow
+    const sunGlowGeometry = new THREE.SphereGeometry(12.5, 64, 64);
+    const sunGlowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xFDB813,
+      transparent: true,
+      opacity: 0.26,
+      side: THREE.BackSide
+    });
+    const sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+    sun.add(sunGlow);
+
+    const coronaRings = [];
+    [18, 25, 34].forEach((radius, index) => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, 0.035 + index * 0.018, 12, 180),
+        new THREE.MeshBasicMaterial({
+          color: index === 0 ? 0xffd18a : 0x8fd3ff,
+          transparent: true,
+          opacity: 0.06 - index * 0.01,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      ring.rotation.x = Math.PI / 2 + index * 0.12;
+      ring.rotation.z = index * 0.7;
+      scene.add(ring);
+      coronaRings.push(ring);
+    });
+
+    // Planetary Specs
+    const PLANET_SPECS = [
+      { name: 'Mercury', radius: 0.8, orbit: 20, period: 0.241, texture: 'mercury', tilt: 0.03, eccentricity: 0.20, tint: 0xc2b6a1, glow: 0xb9a48b },
+      { name: 'Venus',   radius: 1.4, orbit: 30, period: 0.615, texture: 'venus',   tilt: 2.64, eccentricity: 0.006, tint: 0xf0c681, glow: 0xffd192, atmosphere: true },
+      { name: 'Earth',   radius: 1.5, orbit: 42, period: 1.0,   texture: 'earth_day', tilt: 23.5, eccentricity: 0.016, tint: 0xbad9ff, glow: 0x6ab7ff, atmosphere: true },
+      { name: 'Mars',    radius: 1.0, orbit: 58, period: 1.881, texture: 'mars',    tilt: 25.2, eccentricity: 0.093, tint: 0xd87f54, glow: 0xff8d5b },
+      { name: 'Jupiter', radius: 4.5, orbit: 95, period: 11.86, texture: 'jupiter', tilt: 3.1,  eccentricity: 0.048, tint: 0xd8b28a, glow: 0xe8c090 },
+      { name: 'Saturn',  radius: 3.8, orbit: 135, period: 29.46, texture: 'saturn',  tilt: 26.7, eccentricity: 0.054, tint: 0xe6cf9f, glow: 0xf0d9aa },
+      { name: 'Uranus',  radius: 2.5, orbit: 185, period: 84.01, texture: 'uranus',  tilt: 97.8, eccentricity: 0.047, tint: 0xa8e6e8, glow: 0x9ce7ef, atmosphere: true },
+      { name: 'Neptune', radius: 2.4, orbit: 240, period: 164.8, texture: 'neptune', tilt: 28.3, eccentricity: 0.008, tint: 0x4f72d8, glow: 0x6388ff, atmosphere: true },
+      { name: 'Pluto',   radius: 0.4, orbit: 300, period: 248.1, texture: null,      tilt: 122.5, eccentricity: 0.244, color: 0xb99b83, tint: 0xb99b83, glow: 0xd2b69d }
+    ];
+
+    const focusFollowState = {
+      theta: 0,
+      lastName: null,
+      desiredPosition: new THREE.Vector3(),
+      desiredTarget: new THREE.Vector3(),
+      previousTarget: new THREE.Vector3()
+    };
+
+    const sereneTourTargets = ['Earth', 'Mars', 'Jupiter', 'Saturn', 'Neptune'];
+    let sereneTourIndex = 0;
+    let sereneTourTimer = 0;
+
+    function currentBodyRadius(body) {
+      const base = body?.userData?.radius || body?.geometry?.parameters?.radius || 1;
+      const scale = Math.max(body?.scale?.x || 1, body?.scale?.y || 1, body?.scale?.z || 1);
+      return base * scale;
+    }
+
+    function makeAtmosphere(body, color, scale = 1.16, opacity = 0.085) {
+      const radius = body.userData.radius || 1;
+      const geometry = new THREE.SphereGeometry(radius * scale, 48, 48);
+      const material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false
+      });
+      const glow = new THREE.Mesh(geometry, material);
+      glow.userData.isGlow = true;
+      body.add(glow);
+      return glow;
+    }
+
+
+    function createOrbitPath(a, e, color = 0xffffff, opacity = 0.12) {
+      const b = a * Math.sqrt(1 - e * e);
+      // Center of ellipse is at (-c, 0) relative to Sun at (0,0)
+      const c = a * e;
+      const curve = new THREE.EllipseCurve(-c, 0, a, b, 0, 2 * Math.PI, false, 0);
+      const points = curve.getPoints(200);
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: opacity });
+      const orbit = new THREE.Line(geometry, material);
+      orbit.rotation.x = Math.PI / 2;
+      return orbit;
+    }
+
+    PLANET_SPECS.forEach((spec, index) => {
+      // Planet Mesh
+      const geometry = new THREE.SphereGeometry(spec.radius, 32, 32);
+      let material;
+      if (spec.texture) {
+        material = new THREE.MeshPhongMaterial({
+          map: loadedTextures[spec.texture],
+          color: spec.tint || 0xffffff,
+          shininess: spec.name === 'Earth' ? 12 : 4,
+          emissive: spec.glow || 0x000000,
+          emissiveIntensity: 0.018
+        });
+        bindTextureToMaterial(material, spec.texture);
+      } else {
+        material = new THREE.MeshPhongMaterial({
+          color: spec.color || 0xaaaaaa,
+          shininess: 3,
+          emissive: spec.glow || 0x000000,
+          emissiveIntensity: 0.03
+        });
+      }
+
+      const planet = new THREE.Mesh(geometry, material);
+      planet.rotation.z = spec.tilt * (Math.PI / 180);
+      scene.add(planet);
+      bodies[spec.name] = planet;
+      planet.userData = { ...spec, type: 'planet' };
+      if (spec.atmosphere || ['Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].includes(spec.name)) {
+        planet.userData.atmosphereGlow = makeAtmosphere(planet, spec.glow || spec.tint || 0xffffff, spec.name === 'Jupiter' || spec.name === 'Saturn' ? 1.07 : 1.13, spec.name === 'Venus' ? 0.12 : 0.055);
+      }
+
+      // Orbit Path
+      const orbit = createOrbitPath(spec.orbit, spec.eccentricity);
+      orbit.userData = { index: index, a: spec.orbit, e: spec.eccentricity };
+      orbitGroup.add(orbit);
+    });
+
+    // Earth Specialized Details
+    const earth = bodies['Earth'];
+
+    // Custom Shader for Day/Night split
+    const earthShaderMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        dayTexture:   { value: loadedTextures.earth_day },
+        nightTexture: { value: loadedTextures.earth_night },
+        sunDirection: { value: new THREE.Vector3(0,0,0) }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normalMatrix * normal);
+          vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D dayTexture;
+        uniform sampler2D nightTexture;
+        uniform vec3 sunDirection;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        void main() {
+          vec3 L = normalize(sunDirection - vWorldPosition);
+          float dotNormal = dot(vNormal, L);
+          float dayIntensity = smoothstep(-0.2, 0.2, dotNormal);
+          vec4 dayColor = texture2D(dayTexture, vUv);
+          vec4 nightColor = texture2D(nightTexture, vUv);
+          gl_FragColor = mix(nightColor, dayColor, dayIntensity);
+        }
+      `
+    });
+
+    bindTextureToUniform(earthShaderMaterial.uniforms.dayTexture, 'earth_day');
+    bindTextureToUniform(earthShaderMaterial.uniforms.nightTexture, 'earth_night');
+    earth.material = earthShaderMaterial;
+
+    // 2. Cloud layer
+    const cloudGeometry = new THREE.SphereGeometry(1.52, 32, 32);
+    const cloudMaterial = new THREE.MeshPhongMaterial({
+      map: loadedTextures.earth_clouds,
+      alphaMap: loadedTextures.earth_clouds,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.8
+    });
+    bindTextureToMaterial(cloudMaterial, 'earth_clouds', 'map');
+    bindTextureToMaterial(cloudMaterial, 'earth_clouds', 'alphaMap');
+    const clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
+    earth.add(clouds);
+    bodies['EarthClouds'] = clouds;
+
+    // 3. Atmosphere glow
+    const atmosGeometry = new THREE.SphereGeometry(1.6, 32, 32);
+    const atmosMaterial = new THREE.MeshPhongMaterial({
+      color: 0x4fc3f7,
+      transparent: true,
+      opacity: 0.06,
+      side: THREE.BackSide
+    });
+    const atmos = new THREE.Mesh(atmosGeometry, atmosMaterial);
+    earth.add(atmos);
+
+    // Saturn's Rings
+    const saturn = bodies['Saturn'];
+    const ringGeometry = new THREE.RingGeometry(4.5, 7.5, 64);
+    // Correct UVs for RingGeometry to map the texture radially
+    const pos = ringGeometry.attributes.position;
+    const v3 = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v3.fromBufferAttribute(pos, i);
+      const dist = v3.length();
+      const u = (dist - 4.5) / (7.5 - 4.5);
+      ringGeometry.attributes.uv.setXY(i, u, 0);
+    }
+
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      map: loadedTextures.saturn_ring,
+      alphaMap: loadedTextures.saturn_ring,
+      transparent: true,
+      side: THREE.DoubleSide,
+      opacity: 0.8
+    });
+    bindTextureToMaterial(ringMaterial, 'saturn_ring', 'map');
+    bindTextureToMaterial(ringMaterial, 'saturn_ring', 'alphaMap');
+    const rings = new THREE.Mesh(ringGeometry, ringMaterial);
+    rings.rotation.x = Math.PI / 2;
+    saturn.add(rings);
+    bodies['SaturnRings'] = rings;
+
+    // Moons
+    function createMoon(name, parent, radius, orbit, period, color = 0x888888, textureKey = null) {
+      const geometry = new THREE.SphereGeometry(radius, 16, 16);
+      const material = textureKey ?
+        new THREE.MeshPhongMaterial({ map: loadedTextures[textureKey] }) :
+        new THREE.MeshPhongMaterial({ color: color });
+      if (textureKey) bindTextureToMaterial(material, textureKey);
+
+      const moon = new THREE.Mesh(geometry, material);
+      moon.userData = { name, radius, orbit, period, type: 'moon', parentName: parent.userData.name };
+      scene.add(moon);
+      bodies[name] = moon;
+      return moon;
+    }
+
+    createMoon('Moon', bodies['Earth'], 0.4, 3.0, 0.074, null, 'moon');
+    createMoon('Io', bodies['Jupiter'], 0.35, 6.0, 0.0048, 0xe8c840);
+    createMoon('Europa', bodies['Jupiter'], 0.3, 8.0, 0.0097, 0xc8d8e0);
+    createMoon('Ganymede', bodies['Jupiter'], 0.45, 10.5, 0.0196, 0xa08060);
+    createMoon('Callisto', bodies['Jupiter'], 0.42, 14.0, 0.0457, 0x706050);
+    createMoon('Titan', bodies['Saturn'], 0.42, 11.0, 0.0437, 0xc89050);
+
+    // Asteroid Belt
+    function createAsteroidBelt() {
+      const asteroidGeometry = new THREE.BufferGeometry();
+      const positions = [];
+      const colors = [];
+      const sizes = [];
+
+      for (let i = 0; i < 3000; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 70 + Math.random() * 15;
+        const x = Math.cos(angle) * dist;
+        const z = Math.sin(angle) * dist;
+        const y = (Math.random() - 0.5) * 8;
+
+        positions.push(x, y, z);
+
+        const grey = 0.6 + Math.random() * 0.4;
+        colors.push(grey, grey, grey);
+        sizes.push(0.08 + Math.random() * 0.17);
+      }
+
+      asteroidGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      asteroidGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const asteroidMaterial = new THREE.PointsMaterial({
+        size: 0.2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8
+      });
+
+      const belt = new THREE.Points(asteroidGeometry, asteroidMaterial);
+      scene.add(belt);
+      bodies['AsteroidBelt'] = belt;
+    }
+    createAsteroidBelt();
+
+    function createLofiDust() {
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const colors = [];
+      for (let i = 0; i < 1800; i++) {
+        const radius = 38 + Math.random() * 285;
+        const angle = Math.random() * Math.PI * 2;
+        const height = (Math.random() - 0.5) * 32;
+        positions.push(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+        const color = new THREE.Color(Math.random() > 0.56 ? 0x8fd3ff : Math.random() > 0.5 ? 0xf5a6c8 : 0xf6d58b);
+        colors.push(color.r, color.g, color.b);
+      }
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      const material = new THREE.PointsMaterial({
+        size: 0.11,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const dust = new THREE.Points(geometry, material);
+      dust.userData.name = 'LofiDust';
+      scene.add(dust);
+      return dust;
+    }
+    const lofiDust = createLofiDust();
+
+    // Halley's Comet
+    const cometGroup = new THREE.Group();
+    const cometGeometry = new THREE.DodecahedronGeometry(0.45, 1);
+    const cometMaterial = new THREE.MeshPhongMaterial({
+      color: 0x2f302d,
+      emissive: 0x6ecfff,
+      emissiveIntensity: 0.025,
+      shininess: 1
+    });
+    const comet = new THREE.Mesh(cometGeometry, cometMaterial);
+
+    // Halley's nucleus is very dark; only the coma and tail glow as it warms near the Sun.
+    const coma = new THREE.Mesh(
+      new THREE.SphereGeometry(0.82, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xaeefff, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    comet.add(coma);
+
+    const ionTailGeometry = new THREE.ConeGeometry(0.42, 1, 32, 1, true);
+    ionTailGeometry.translate(0, 0.5, 0);
+    const ionTail = new THREE.Mesh(ionTailGeometry, new THREE.MeshBasicMaterial({
+      color: 0x98e8ff,
+      transparent: true,
+      opacity: 0.24,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    }));
+    ionTail.rotation.x = -Math.PI / 2;
+    comet.add(ionTail);
+
+    const dustTailGeometry = new THREE.ConeGeometry(0.58, 1, 32, 1, true);
+    dustTailGeometry.translate(0, 0.5, 0);
+    const dustTail = new THREE.Mesh(dustTailGeometry, new THREE.MeshBasicMaterial({
+      color: 0xffe1a8,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    }));
+    dustTail.rotation.x = -Math.PI / 2;
+    dustTail.rotation.z = 0.18;
+    comet.add(dustTail);
+
+    scene.add(comet);
+    bodies['Comet'] = comet;
+    comet.userData = {
+      name: 'Comet',
+      type: 'comet',
+      perihelion: 34,
+      aphelion: 300,
+      period: 75,
+      phase: 2.35,
+      inclination: 18 * (Math.PI / 180)
+    };
+
+    // Comet Orbit Path
+    const ca = (comet.userData.perihelion + comet.userData.aphelion) / 2;
+    const cc = ca - comet.userData.perihelion;
+    const ce = cc / ca;
+    const cb = ca * Math.sqrt(1 - ce * ce);
+    const cometOrbit = createOrbitPath(ca, ce, 0x64cccc, 0.15);
+
+    const cometOrbitGroup = new THREE.Group();
+    cometOrbitGroup.add(cometOrbit);
+    cometOrbitGroup.rotation.z = comet.userData.inclination;
+    scene.add(cometOrbitGroup); // Not in orbitGroup to avoid scaling
+    comet.userData.orbitGroup = cometOrbitGroup;
+    comet.userData.a = ca;
+    comet.userData.e = ce;
+    comet.userData.c = cc;
+
+    // --- Labels ---
+    const labelGroup = new THREE.Group();
+    scene.add(labelGroup);
+
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function createLabel(text, size = 12) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const fontSize = size * 2;
+      const font = `600 ${fontSize}px Courier New, Courier, monospace`;
+      ctx.font = font;
+      const metrics = ctx.measureText(text);
+      const paddingX = Math.ceil(fontSize * 0.82);
+      const paddingY = Math.ceil(fontSize * 0.58);
+      const cssWidth = Math.ceil(metrics.width + paddingX * 2);
+      const cssHeight = Math.ceil(fontSize + paddingY * 2);
+
+      canvas.width = cssWidth * dpr;
+      canvas.height = cssHeight * dpr;
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+      ctx.scale(dpr, dpr);
+      ctx.font = font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const radius = Math.min(16, cssHeight / 2);
+      drawRoundedRect(ctx, 1, 1, cssWidth - 2, cssHeight - 2, radius);
+      ctx.fillStyle = 'rgba(5, 9, 18, 0.62)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(143, 211, 255, 0.36)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowColor = 'rgba(143, 211, 255, 0.42)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#edf6ff';
+      ctx.fillText(text, cssWidth / 2, cssHeight / 2 + 0.5);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.encoding = THREE.sRGBEncoding;
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, sizeAttenuation: false });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(0.075 * (cssWidth / 100), 0.075 * (cssHeight / 100), 1);
+      return sprite;
+    }
+
+    // Add labels to all bodies
+    for (const [name, body] of Object.entries(bodies)) {
+      if (body.userData && body.userData.name) {
+        let labelText = name;
+        if (name === 'Pluto') labelText = 'Pluto (Dwarf Planet)';
+        const label = createLabel(labelText, body.userData.type === 'moon' ? 10 : 12);
+        body.userData.label = label;
+        labelGroup.add(label);
+        if (body.userData.type === 'moon') label.visible = false; // Moons hidden by default
+      }
+    }
+
+    // --- Raycasting & Hover ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredObject = null;
+
+    window.addEventListener('mousemove', (event) => {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    function updateHover() {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(Object.values(bodies));
+
+      let foundMoon = null;
+      if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        if (obj.userData.type === 'moon') {
+          foundMoon = obj;
+        }
+      }
+
+      // Hide previous moon label if no longer hovered
+      if (hoveredObject && hoveredObject.userData.type === 'moon' && hoveredObject !== foundMoon) {
+        if (!labelsToggle) hoveredObject.userData.label.visible = false;
+        else if (hoveredObject.userData.type === 'moon') hoveredObject.userData.label.visible = false;
+      }
+
+      if (foundMoon) {
+        foundMoon.userData.label.visible = true;
+      }
+      hoveredObject = foundMoon;
+    }
+
+    let labelsToggle = true;
+
+    // --- Interaction ---
+    let focusedBody = null;
+    let cameraLerpTarget = null;
+    let lookAtLerpTarget = null;
+    const comfortSettings = {
+      keepFollowAfterInfoClose: true,
+      sereneDrift: true,
+      dimUi: false
+    };
+
+    function releaseCameraFocus(updateHud = true) {
+      focusedBody = null;
+      focusFollowState.lastName = null;
+      cameraLerpTarget = null;
+      lookAtLerpTarget = null;
+      if (updateHud) document.getElementById('hud-focus').innerText = comfortSettings.sereneDrift ? 'Free drift' : 'Manual view';
+    }
+
+    function localizedFact(name) {
+      return I18N[currentLanguage].fact?.[name] || PLANET_DATA[name]?.fact || '';
+    }
+
+    function setStaticLanguage() {
+      document.documentElement.lang = currentLanguage;
+      document.querySelectorAll('[data-i18n]').forEach(node => {
+        const value = t(node.dataset.i18n);
+        if (typeof value === 'string') node.innerText = value;
+      });
+      document.getElementById('loading-status').innerText = t('loading');
+      document.getElementById('palette-input').placeholder = t('palettePlaceholder');
+      document.getElementById('tour-prev').innerText = t('tourPrev');
+      document.getElementById('tour-next').innerText = t('tourNext');
+      document.getElementById('language-select').value = currentLanguage;
+      playPauseBtn.innerText = isPaused ? t('playButton') : t('pauseButton');
+      document.getElementById('true-scale-btn').innerText = trueScaleActive ? t('visualScaleButton') : t('trueScaleButton');
+      document.querySelectorAll('.info-tab').forEach(button => { button.innerText = t(button.dataset.i18n); });
+      if (currentInfoName) {
+        document.getElementById('info-category').innerText = localizedCategory(currentInfoName);
+        switchInfoTab(activeInfoTab, false);
+      }
+      renderTourStep(false);
+      renderPalette();
+    }
+
+    let activeInfoTab = 'data';
+    let currentInfoName = null;
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function localizedStory(name) {
+      return I18N[currentLanguage].story?.[name] || I18N.en.story?.[name] || localizedFact(name);
+    }
+
+    function localizedCategory(name) {
+      return BODY_CATEGORY[currentLanguage]?.[name] || BODY_CATEGORY.en[name] || '';
+    }
+
+    function localizedTimeline(name) {
+      const base = BODY_INTEL[name]?.timeline || [];
+      const descriptions = LOCALIZED_TIMELINES[currentLanguage]?.[name];
+      return base.map(([year, event], index) => [year, descriptions?.[index] || event]);
+    }
+
+    function renderStoryParagraph(text) {
+      const firstBreak = text.search(/[.!?](\s|$)/);
+      if (firstBreak === -1) return `<p class="story-copy"><span class="story-first">${escapeHTML(text)}</span></p>`;
+      const first = text.slice(0, firstBreak + 1);
+      const rest = text.slice(firstBreak + 1);
+      return `<p class="story-copy"><span class="story-first">${escapeHTML(first)}</span>${escapeHTML(rest)}</p>`;
+    }
+
+    function renderMetricBars(name, animate = true) {
+      const intel = BODY_INTEL[name];
+      if (!intel) return;
+      const rows = document.querySelectorAll('#info-meters .meter-row');
+      rows.forEach(row => {
+        const value = Number(row.dataset.value || 0);
+        const fill = row.querySelector('.meter-fill');
+        const number = row.querySelector('.meter-number');
+        fill.style.transition = 'none';
+        fill.style.width = '0%';
+        number.textContent = '0';
+        if (!animate) {
+          fill.style.width = `${value}%`;
+          number.textContent = value;
+          return;
+        }
+        requestAnimationFrame(() => {
+          fill.style.transition = 'width 600ms ease-out';
+          fill.style.width = `${value}%`;
+          const start = performance.now();
+          const tick = now => {
+            const progress = Math.min((now - start) / 600, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            number.textContent = Math.round(value * eased);
+            if (progress < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+      });
+    }
+
+    function renderInfoContent(name, tab = activeInfoTab) {
+      const data = PLANET_DATA[name];
+      const profile = CELESTIAL_PROFILES[name] || { gravity: '—', temp: '—', velocity: '—', mission: '—' };
+      const intel = BODY_INTEL[name] || { habitability: 0, drama: 0, explored: 0, badges: [], timeline: [] };
+      const content = document.getElementById('info-content');
+
+      if (tab === 'story') {
+        content.innerHTML = renderStoryParagraph(localizedStory(name));
+        return;
+      }
+
+      if (tab === 'missions') {
+        const timeline = localizedTimeline(name);
+        content.innerHTML = `<div class="timeline-list">${timeline.map(([year, event], index) => `
+          <div class="timeline-item" style="animation-delay:${index * 80}ms"><span class="timeline-year">${escapeHTML(year)}</span>${escapeHTML(event)}</div>
+        `).join('')}</div>`;
+        return;
+      }
+
+      const meters = [
+        [t('metricHabitability'), intel.habitability],
+        [t('metricDrama'), intel.drama],
+        [t('metricExplored'), intel.explored]
+      ];
+      content.innerHTML = `
+        <div class="info-row"><span class="info-label">${escapeHTML(t('diameterLabel'))}</span><span class="info-value">${escapeHTML(data.diameter)}</span></div>
+        <div class="info-row"><span class="info-label">${escapeHTML(t('distanceLabel'))}</span><span class="info-value">${escapeHTML(data.distanceFromSun)}</span></div>
+        <div class="info-row"><span class="info-label">${escapeHTML(t('dayLabel'))}</span><span class="info-value">${escapeHTML(data.dayLength)}</span></div>
+        <div class="info-row"><span class="info-label">${escapeHTML(t('yearLabel'))}</span><span class="info-value">${escapeHTML(data.yearLength)}</span></div>
+        <div class="info-row"><span class="info-label">${escapeHTML(t('moonsLabel'))}</span><span class="info-value">${escapeHTML(data.moons)}</span></div>
+        <div class="divider"></div>
+        <div class="info-meta-grid">
+          <div class="info-meta"><div class="status-label">${escapeHTML(t('gravityLabel'))}</div><div class="status-value">${escapeHTML(profile.gravity)}</div></div>
+          <div class="info-meta"><div class="status-label">${escapeHTML(t('tempLabel'))}</div><div class="status-value">${escapeHTML(profile.temp)}</div></div>
+          <div class="info-meta"><div class="status-label">${escapeHTML(t('velocityLabel'))}</div><div class="status-value">${escapeHTML(profile.velocity)}</div></div>
+          <div class="info-meta"><div class="status-label">${escapeHTML(t('missionLabel'))}</div><div class="status-value">${escapeHTML(profile.mission)}</div></div>
+        </div>
+        <div id="info-meters" class="meter-stack">
+          ${meters.map(([label, value]) => `<div class="meter-row" data-value="${value}"><span>${escapeHTML(label)}</span><span class="meter-track"><span class="meter-fill"></span></span><span class="meter-number">0</span></div>`).join('')}
+        </div>
+        <div class="mission-badge-row">${intel.badges.map(badge => `<span class="mission-badge">${escapeHTML(badge)}</span>`).join('')}</div>
+        <div class="divider"></div>
+        <div class="info-fact">${escapeHTML(localizedFact(name))}</div>
+      `;
+      renderMetricBars(name);
+    }
+
+    function switchInfoTab(tab, animate = true) {
+      if (!currentInfoName) return;
+      activeInfoTab = tab;
+      document.querySelectorAll('.info-tab').forEach(button => {
+        const active = button.dataset.tab === tab;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      const content = document.getElementById('info-content');
+      if (!animate) {
+        renderInfoContent(currentInfoName, tab);
+        return;
+      }
+      content.classList.add('is-switching');
+      setTimeout(() => {
+        renderInfoContent(currentInfoName, tab);
+        requestAnimationFrame(() => content.classList.remove('is-switching'));
+      }, 150);
+    }
+
+    function showInfo(name) {
+      const data = PLANET_DATA[name];
+      if (!data) return;
+
+      currentInfoName = name;
+      activeInfoTab = 'data';
+      const panel = document.getElementById('info-panel');
+      panel.style.setProperty('--current-accent', PLANET_COLORS[name] || 'var(--accent)');
+      document.getElementById('info-title').innerText = name;
+      document.getElementById('info-category').innerText = localizedCategory(name);
+      document.getElementById('hud-focus').innerText = name;
+      document.getElementById('info-panel').classList.add('open');
+      switchInfoTab('data', false);
+    }
+
+    function hideInfo() {
+      document.getElementById('info-panel').classList.remove('open');
+      if (!comfortSettings.keepFollowAfterInfoClose) releaseCameraFocus();
+    }
+
+    document.getElementById('info-close').onclick = hideInfo;
+    document.querySelectorAll('.info-tab').forEach(button => {
+      button.addEventListener('click', () => switchInfoTab(button.dataset.tab));
+    });
+
+    window.addEventListener('mousedown', (event) => {
+      // If clicking outside panel when it's open, hide it
+      const infoPanel = document.getElementById('info-panel');
+      if (infoPanel.classList.contains('open') &&
+          !infoPanel.contains(event.target) &&
+          event.target.tagName !== 'BUTTON') {
+        // Only hide if we didn't hit a new object
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(Object.values(bodies));
+        if (intersects.length === 0) hideInfo();
+      }
+
+      // Only trigger if clicking on canvas
+      if (event.target.tagName !== 'CANVAS') return;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(Object.values(bodies));
+
+      if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        if (obj.userData && obj.userData.name) {
+          focusedBody = obj;
+          showInfo(obj.userData.name);
+
+          // Calculate camera target position
+          const radius = obj.userData.radius || 1;
+          const targetDist = radius * 5 + 5;
+
+          // We'll update the target in the animate loop
+        }
+      }
+    });
+
+    // --- Simulation Logic ---
+    let simTime = 0;
+    let speedMultiplier = 1;
+    let isPaused = false;
+    let orbitsVisible = true;
+
+    const speedPresets = [0.1, 0.25, 0.5, 1, 2, 5, 12, 30, 80];
+    let speedIndex = 3; // Start at a calm 1x
+
+    const ORBIT_PHASES = {
+      Mercury: 0.45,
+      Venus: 1.25,
+      Earth: 2.1,
+      Mars: 2.85,
+      Jupiter: 3.55,
+      Saturn: 4.25,
+      Uranus: 5.05,
+      Neptune: 5.75,
+      Pluto: 0.95
+    };
+    const VISUAL_ORBIT_SECONDS_PER_YEAR = 86400 * 365.25;
+    const VISUAL_ORBIT_ACCELERATION = 100000;
+
+    function visualOrbitAngle(spec) {
+      // Compress long orbital periods so outer worlds visibly drift while preserving
+      // the correct ordering: Mercury still moves fastest, Pluto still moves slowest.
+      const compressedPeriod = Math.max(0.18, Math.sqrt(spec.period));
+      const angularProgress = (simTime / (compressedPeriod * VISUAL_ORBIT_SECONDS_PER_YEAR)) * Math.PI * 2 * VISUAL_ORBIT_ACCELERATION;
+      return (ORBIT_PHASES[spec.name] || 0) + angularProgress;
+    }
+
+    function updateSimulation(deltaTime) {
+      if (isPaused) return;
+
+      // Update Scale Interpolation
+      if (trueScaleActive && scaleInterpolation < 1) scaleInterpolation += 0.02;
+      else if (!trueScaleActive && scaleInterpolation > 0) scaleInterpolation -= 0.02;
+      scaleInterpolation = Math.max(0, Math.min(1, scaleInterpolation));
+
+      simTime += deltaTime * speedMultiplier;
+      const date = new Date();
+      date.setSeconds(date.getSeconds() + simTime);
+      document.getElementById('date-display').innerText = date.toISOString().split('T')[0];
+
+      // Update positions
+      PLANET_SPECS.forEach((spec, index) => {
+        const body = bodies[spec.name];
+        const angle = visualOrbitAngle(spec);
+
+        // Scale Interpolation for Orbit
+        const visualA = spec.orbit;
+        const trueA = TRUE_ORBITS[spec.name] || spec.orbit;
+        const a = visualA + (trueA - visualA) * scaleInterpolation;
+
+        // Scale Interpolation for Radius
+        const visualR = spec.radius;
+        const trueR = TRUE_RADII[spec.name] || spec.radius;
+        const currentR = visualR + (trueR - visualR) * scaleInterpolation;
+        body.scale.set(currentR / visualR, currentR / visualR, currentR / visualR);
+
+        const e = spec.eccentricity;
+        const b = a * Math.sqrt(1 - e * e);
+        const c = a * e;
+
+        // Simple Keplerian orbit approximation
+        body.position.x = a * Math.cos(angle) - c;
+        body.position.z = b * Math.sin(angle);
+
+        // Update Orbit Line position/scale
+        const orbitLine = orbitGroup.children[index];
+        if (orbitLine) {
+          const visualB = visualA * Math.sqrt(1 - e * e);
+          orbitLine.scale.set(a / visualA, b / visualB, 1);
+          orbitLine.position.x = -(c - (visualA * e * (a / visualA))); // Adjust for focal shift
+          // Simpler: just rebuild the geometry if scaling gets weird, but scaling should work if centered correctly.
+          // Since createOrbitPath now centers it at -c, we just need to scale it.
+          // Wait, if it's centered at -visualC, then scaling it by a/visualA will move the center to -visualC * (a/visualA) = -trueC. Correct.
+          orbitLine.position.x = 0;
+        }
+
+        // Self-rotation
+        body.rotation.y += 0.0022;
+
+        // Update Label
+        if (body.userData.label) {
+          body.userData.label.position.copy(body.position);
+          body.userData.label.position.y += spec.radius + 1.5;
+        }
+      });
+
+      // Update Sun Scale
+      const sunVisualR = 12;
+      const sunTrueR = TRUE_RADII['Sun'];
+      const currentSunR = sunVisualR + (sunTrueR - sunVisualR) * scaleInterpolation;
+      sun.scale.set(currentSunR / sunVisualR, currentSunR / sunVisualR, currentSunR / sunVisualR);
+
+      // Update Earth custom shader
+      const earthPos = new THREE.Vector3();
+      bodies['Earth'].getWorldPosition(earthPos);
+      bodies['Earth'].material.uniforms.sunDirection.value.copy(sun.position);
+      bodies['EarthClouds'].rotation.y += 0.00065;
+      sunGlow.scale.setScalar(1 + Math.sin(simTime * 0.00018) * 0.035);
+      coronaRings.forEach((ring, index) => {
+        ring.rotation.z += (index % 2 ? -1 : 1) * (0.00008 + index * 0.000035);
+        ring.material.opacity = 0.035 + Math.sin(simTime * 0.00013 + index) * 0.012;
+      });
+      PLANET_SPECS.forEach(spec => {
+        const glow = bodies[spec.name]?.userData?.atmosphereGlow;
+        if (glow?.scale) glow.scale.setScalar(1 + Math.sin(simTime * 0.00012 + spec.orbit) * 0.018);
+      });
+
+      // Update Moons
+      const moonSpecs = [
+        { name: 'Moon', parent: 'Earth' },
+        { name: 'Io', parent: 'Jupiter' },
+        { name: 'Europa', parent: 'Jupiter' },
+        { name: 'Ganymede', parent: 'Jupiter' },
+        { name: 'Callisto', parent: 'Jupiter' },
+        { name: 'Titan', parent: 'Saturn' }
+      ];
+
+      moonSpecs.forEach(m => {
+        const moon = bodies[m.name];
+        const parent = bodies[m.parent];
+        const angle = (simTime / (moon.userData.period * 86400)) * Math.PI * 2 * 100;
+
+        const orbit = moon.userData.orbit;
+        moon.position.x = parent.position.x + Math.cos(angle) * orbit;
+        moon.position.z = parent.position.z + Math.sin(angle) * orbit;
+        moon.position.y = parent.position.y;
+
+        if (moon.userData.label) {
+          moon.userData.label.position.copy(moon.position);
+          moon.userData.label.position.y += moon.userData.radius + 1.0;
+        }
+      });
+
+      // Update Comet
+      const comet = bodies['Comet'];
+      const cSpec = comet.userData;
+      const cCompressedPeriod = Math.sqrt(cSpec.period);
+      const cAngle = cSpec.phase + (simTime / (cCompressedPeriod * VISUAL_ORBIT_SECONDS_PER_YEAR)) * Math.PI * 2 * VISUAL_ORBIT_ACCELERATION;
+
+      const ca = cSpec.a;
+      const ce = cSpec.e;
+      const cb = ca * Math.sqrt(1 - ce * ce);
+      const cc = cSpec.c;
+
+      const cx = ca * Math.cos(cAngle) - cc;
+      const cy = cb * Math.sin(cAngle);
+
+      // Rotate for inclination
+      const pos = new THREE.Vector3(cx, 0, cy);
+      pos.applyAxisAngle(new THREE.Vector3(0, 0, 1), cSpec.inclination);
+      comet.position.copy(pos);
+
+      // Comet tails point away from the Sun: blue ion tail straighter, golden dust tail wider and softer.
+      const distToSun = comet.position.length();
+      const warmth = THREE.MathUtils.clamp(1 - distToSun / 260, 0.06, 1);
+      const tailLen = 2.2 + warmth * 15;
+      const awayFromSun = comet.position.lengthSq() > 0.0001 ? comet.position.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      const tailLookTarget = comet.position.clone().add(awayFromSun);
+      ionTail.lookAt(tailLookTarget);
+      ionTail.rotateX(Math.PI / 2);
+      ionTail.scale.set(0.7 + warmth * 1.1, tailLen, 0.7 + warmth * 1.1);
+      ionTail.material.opacity = 0.06 + warmth * 0.28;
+      dustTail.lookAt(tailLookTarget.clone().add(new THREE.Vector3(0.15, -0.08, 0.2)));
+      dustTail.rotateX(Math.PI / 2);
+      dustTail.scale.set(1.1 + warmth * 1.6, tailLen * 0.68, 1.1 + warmth * 1.6);
+      dustTail.material.opacity = 0.035 + warmth * 0.16;
+      coma.material.opacity = 0.04 + warmth * 0.18;
+
+      if (comet.userData.label) {
+        comet.userData.label.position.copy(comet.position);
+        comet.userData.label.position.y += 1.0;
+      }
+
+      // Rotate Asteroid Belt and ambient lofi dust very slowly.
+      bodies['AsteroidBelt'].rotation.y += 0.000025;
+      lofiDust.rotation.y += 0.000018;
+      lofiDust.rotation.x = Math.sin(simTime * 0.000035) * 0.018;
+    }
+
+    // --- Light Travel Feature ---
+    let lightTravelActive = false;
+    let lightStartTime = 0;
+    const lightLabels = [];
+
+    const lightData = [
+      { name: 'Mercury', time: '3.2 min', orbit: 20 },
+      { name: 'Venus',   time: '6.0 min', orbit: 30 },
+      { name: 'Earth',   time: '8.3 min', orbit: 42 },
+      { name: 'Mars',    time: '12.7 min', orbit: 58 },
+      { name: 'Jupiter', time: '43.2 min', orbit: 95 },
+      { name: 'Saturn',  time: '1h 19m', orbit: 135 },
+      { name: 'Uranus',  time: '2h 40m', orbit: 185 },
+      { name: 'Neptune', time: '4h 9m', orbit: 240 },
+      { name: 'Pluto',   time: '5h 28m', orbit: 300 }
+    ];
+
+    const lightRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.1, 16, 100),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+    );
+    lightRing.rotation.x = Math.PI / 2;
+    lightRing.visible = false;
+    scene.add(lightRing);
+
+    function startLightTravel() {
+      if (lightTravelActive) return;
+
+      lightTravelActive = true;
+      isPaused = true;
+      if (typeof playPauseBtn !== 'undefined') playPauseBtn.innerText = t('playButton');
+      lightStartTime = performance.now();
+
+      lightRing.visible = true;
+      lightRing.scale.set(0.1, 0.1, 0.1);
+
+      document.getElementById('light-travel-counter').style.display = 'block';
+      document.getElementById('light-travel-btn').classList.add('active');
+
+      // Clear old labels
+      lightLabels.forEach(l => scene.remove(l));
+      lightLabels.length = 0;
+      lightData.forEach(d => d.passed = false);
+    }
+
+    function updateLightTravel() {
+      if (!lightTravelActive) return;
+
+      const elapsed = (performance.now() - lightStartTime) / 1000;
+      // Calibrate so Earth (42 units) is reached in ~8 seconds
+      // Speed = 42 / 8 = 5.25 units/sec
+      const currentRadius = elapsed * 5.25;
+
+      lightRing.scale.set(currentRadius, currentRadius, 1);
+
+      // Update Counter
+      // 8 real seconds = 8.3 light minutes = 498 light seconds
+      const totalLightSeconds = elapsed * (498 / 8);
+      const minutes = Math.floor(totalLightSeconds / 60);
+      const seconds = Math.floor(totalLightSeconds % 60);
+      document.getElementById('light-travel-counter').innerText = `${t('lightCounter')}: ${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+
+      // Check planets
+      lightData.forEach(d => {
+        if (!d.passed && currentRadius >= d.orbit) {
+          d.passed = true;
+          const label = createLabel(d.time, 10);
+          const body = bodies[d.name];
+          label.position.copy(body.position);
+          label.position.y += body.userData.radius + 3.0;
+          scene.add(label);
+          lightLabels.push(label);
+        }
+      });
+
+      if (currentRadius > 310) {
+        stopLightTravel();
+      }
+    }
+
+    function stopLightTravel() {
+      lightTravelActive = false;
+      isPaused = false;
+      if (typeof playPauseBtn !== 'undefined') playPauseBtn.innerText = t('pauseButton');
+      lightRing.visible = false;
+      document.getElementById('light-travel-btn').classList.remove('active');
+      setTimeout(() => {
+        document.getElementById('light-travel-counter').style.display = 'none';
+        lightLabels.forEach(l => scene.remove(l));
+      }, 3000);
+    }
+
+    document.getElementById('light-travel-btn').onclick = startLightTravel;
+
+    // --- True Scale Mode ---
+    let trueScaleActive = false;
+    let scaleInterpolation = 0; // 0 = visual, 1 = true
+
+    // True Scale Data
+    const TRUE_ORBITS = {
+      Mercury: 28.9, Venus: 54.1, Earth: 74.8, Mars: 113.9,
+      Jupiter: 389.2, Saturn: 716, Uranus: 1435, Neptune: 2247, Pluto: 2950
+    };
+    // True Radii
+    const TRUE_RADII = {
+      Sun: 150, // Scaled for visibility
+      Mercury: 0.1, Venus: 0.25, Earth: 0.26, Mars: 0.14,
+      Jupiter: 2.8, Saturn: 2.4, Uranus: 1.0, Neptune: 1.0, Pluto: 0.05
+    };
+
+    function toggleTrueScale() {
+      trueScaleActive = !trueScaleActive;
+      document.getElementById('true-scale-btn').innerText = trueScaleActive ? t('visualScaleButton') : t('trueScaleButton');
+      document.getElementById('true-scale-btn').classList.toggle('active', trueScaleActive);
+      document.getElementById('true-scale-overlay').style.opacity = trueScaleActive ? '1' : '0';
+
+      if (trueScaleActive) {
+        focusedBody = null;
+        camera.position.set(0, 1000, 2000);
+        controls.target.set(0, 0, 0);
+      }
+    }
+
+    document.getElementById('true-scale-btn').onclick = toggleTrueScale;
+
+    // --- UI Controls ---
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    playPauseBtn.onclick = () => {
+      isPaused = !isPaused;
+      playPauseBtn.innerText = isPaused ? t('playButton') : t('pauseButton');
+    };
+
+    const orbitsBtn = document.getElementById('orbits-btn');
+    orbitsBtn.onclick = () => {
+      orbitsVisible = !orbitsVisible;
+      orbitGroup.visible = orbitsVisible;
+      orbitsBtn.classList.toggle('active', orbitsVisible);
+    };
+
+    const labelsBtn = document.getElementById('labels-btn');
+    labelsBtn.onclick = () => {
+      labelsToggle = !labelsToggle;
+      labelGroup.visible = labelsToggle;
+      labelsBtn.classList.toggle('active', labelsToggle);
+    };
+
+    const speedSlider = document.getElementById('speed-slider');
+    const speedDisplay = document.getElementById('speed-display');
+    function syncSpeedControl(value = speedMultiplier) {
+      const next = Math.max(0.1, Number.parseFloat(value) || 1);
+      speedMultiplier = next;
+      speedSlider.value = String(next);
+      speedDisplay.innerText = next.toFixed(next < 10 ? 1 : 0) + 'x';
+    }
+
+    speedSlider.oninput = () => syncSpeedControl(speedSlider.value);
+    syncSpeedControl(1);
+
+    document.getElementById('speed-down-btn').onclick = () => {
+      if (speedIndex > 0) {
+        speedIndex--;
+        speedMultiplier = speedPresets[speedIndex];
+        speedSlider.value = speedMultiplier;
+        speedDisplay.innerText = speedMultiplier.toFixed(speedMultiplier < 10 ? 1 : 0) + 'x';
+      }
+    };
+
+    document.getElementById('speed-up-btn').onclick = () => {
+      if (speedIndex < speedPresets.length - 1) {
+        speedIndex++;
+        speedMultiplier = speedPresets[speedIndex];
+        speedSlider.value = speedMultiplier;
+        speedDisplay.innerText = speedMultiplier.toFixed(speedMultiplier < 10 ? 1 : 0) + 'x';
+      }
+    };
+
+    document.getElementById('fullscreen-btn').onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    };
+
+    document.getElementById('help-btn').onclick = () => {
+      document.getElementById('help-panel').style.display = 'block';
+    };
+    document.getElementById('help-close').onclick = () => {
+      document.getElementById('help-panel').style.display = 'none';
+    };
+
+
+    // --- Lofi Radio ---
+    // Official SomaFM direct MP3 links verified from their Direct Stream Links pages.
+    // The <audio> element deliberately has no crossOrigin attribute; playback does
+    // not need canvas-safe CORS, and avoiding it keeps these direct streams stable.
+    const RADIO_STATIONS = [
+      {
+        name: 'Groove Salad',
+        mood: 'Downtempo / lofi chill',
+        url: 'https://ice5.somafm.com/groovesalad-128-mp3',
+        fallbackUrl: 'https://ice3.somafm.com/groovesalad-128-mp3'
+      },
+      {
+        name: 'Space Station Soma',
+        mood: 'Spaced-out ambient',
+        url: 'https://ice5.somafm.com/spacestation-128-mp3',
+        fallbackUrl: 'https://ice3.somafm.com/spacestation-128-mp3'
+      },
+      {
+        name: 'Drone Zone',
+        mood: 'Deep ambient drift',
+        url: 'https://ice5.somafm.com/dronezone-128-mp3',
+        fallbackUrl: 'https://ice3.somafm.com/dronezone-128-mp3'
+      }
+    ];
+
+    const radioPanel = document.getElementById('radio-panel');
+    const radioButton = document.getElementById('radio-btn');
+    const radioAudio = document.getElementById('radio-audio');
+    const radioToggle = document.getElementById('radio-toggle');
+    const radioStationSelect = document.getElementById('radio-station');
+    const radioNow = document.getElementById('radio-now');
+    const radioVolume = document.getElementById('radio-volume');
+    const radioVolumeDisplay = document.getElementById('radio-volume-display');
+    let radioPlaying = false;
+    let radioUsingFallback = false;
+
+    RADIO_STATIONS.forEach((station, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `${station.name} — ${station.mood}`;
+      radioStationSelect.appendChild(option);
+    });
+
+    function currentRadioStation() {
+      return RADIO_STATIONS[Number(radioStationSelect.value) || 0];
+    }
+
+    function updateRadioStatus(message = '') {
+      const station = currentRadioStation();
+      radioNow.textContent = message || `${station.name} · ${station.mood}`;
+      radioToggle.innerText = radioPlaying ? '❚❚ PAUSE' : '▶ PLAY';
+      radioButton.classList.toggle('active', radioPlaying);
+    }
+
+    function setRadioSource(station = currentRadioStation(), useFallback = false) {
+      radioUsingFallback = useFallback;
+      radioAudio.src = useFallback && station.fallbackUrl ? station.fallbackUrl : station.url;
+      updateRadioStatus(`${station.name} ready · ${station.mood}`);
+    }
+
+    async function playRadio() {
+      const station = currentRadioStation();
+      if (!radioAudio.src) setRadioSource(station, false);
+      radioAudio.volume = Number(radioVolume.value);
+      updateRadioStatus(`Connecting to ${station.name}…`);
+      try {
+        await radioAudio.play();
+        radioPlaying = true;
+        updateRadioStatus(`Playing ${station.name} · ${station.mood}`);
+      } catch (error) {
+        radioPlaying = false;
+        updateRadioStatus('Press play again, or choose another station.');
+        toast('Radio paused', 'Browsers only allow stream playback after a direct user gesture.');
+      }
+    }
+
+    function pauseRadio() {
+      radioAudio.pause();
+      radioPlaying = false;
+      updateRadioStatus();
+    }
+
+    radioButton.onclick = () => {
+      radioPanel.classList.toggle('open');
+      if (radioPanel.classList.contains('open')) updateRadioStatus();
+    };
+    document.getElementById('radio-close').onclick = () => radioPanel.classList.remove('open');
+    radioToggle.onclick = () => radioPlaying ? pauseRadio() : playRadio();
+    radioStationSelect.onchange = () => {
+      const wasPlaying = radioPlaying;
+      pauseRadio();
+      radioAudio.removeAttribute('src');
+      radioUsingFallback = false;
+      updateRadioStatus();
+      if (wasPlaying) playRadio();
+    };
+    radioVolume.oninput = () => {
+      radioAudio.volume = Number(radioVolume.value);
+      radioVolumeDisplay.innerText = `${Math.round(Number(radioVolume.value) * 100)}%`;
+    };
+    radioAudio.addEventListener('waiting', () => updateRadioStatus(`Buffering ${currentRadioStation().name}…`));
+    radioAudio.addEventListener('playing', () => { radioPlaying = true; updateRadioStatus(`Playing ${currentRadioStation().name} · ${currentRadioStation().mood}`); });
+    radioAudio.addEventListener('pause', () => { radioPlaying = false; updateRadioStatus(); });
+    radioAudio.addEventListener('error', () => {
+      const station = currentRadioStation();
+      if (!radioUsingFallback && station.fallbackUrl) {
+        setRadioSource(station, true);
+        if (radioPlaying) playRadio();
+        else updateRadioStatus(`${station.name} switched to backup stream.`);
+        return;
+      }
+      radioPlaying = false;
+      updateRadioStatus(`${station.name} is unavailable right now. Try another station.`);
+    });
+    radioVolume.oninput();
+    updateRadioStatus();
+
+
+
+    // --- Beyond Production Systems: tours, command palette, HUD, quality, snapshots ---
+    const toastStack = document.getElementById('toast-stack');
+    const palette = document.getElementById('command-palette');
+    const paletteInput = document.getElementById('palette-input');
+    const paletteResults = document.getElementById('palette-results');
+    const tourPanel = document.getElementById('tour-panel');
+    const constellationCanvas = document.getElementById('constellation-layer');
+    const constellationCtx = constellationCanvas.getContext('2d');
+
+    function toast(title, detail = '') {
+      const node = document.createElement('div');
+      node.className = 'toast';
+      node.innerHTML = `<div class="mono accent small uppercase">${title}</div>${detail ? `<div class="small" style="margin-top: 4px; color: var(--text-muted); line-height: 1.45;">${detail}</div>` : ''}`;
+      toastStack.appendChild(node);
+      setTimeout(() => {
+        node.style.opacity = '0';
+        node.style.transform = 'translateY(10px)';
+        setTimeout(() => node.remove(), 250);
+      }, 3600);
+    }
+
+    function focusBodyByName(name, announce = true) {
+      const body = bodies[name];
+      if (!body || !body.userData || !body.userData.name) return;
+      focusedBody = body;
+      focusFollowState.lastName = null;
+      showInfo(body.userData.name);
+      if (announce) toast(t('tracking')(name), localizedFact(name) || t('targetAcquired'));
+    }
+
+    const cameraPresets = {
+      'Inner system': { position: new THREE.Vector3(0, 85, 160), target: new THREE.Vector3(0, 0, 0) },
+      'Outer system': { position: new THREE.Vector3(0, 280, 620), target: new THREE.Vector3(0, 0, 0) },
+      'Top-down map': { position: new THREE.Vector3(0, 720, 0.1), target: new THREE.Vector3(0, 0, 0) },
+      'Ecliptic edge': { position: new THREE.Vector3(0, 20, 520), target: new THREE.Vector3(0, 0, 0) },
+      'Hero flyby': { position: new THREE.Vector3(-95, 45, 105), target: new THREE.Vector3(20, 0, 0) }
+    };
+
+    function applyCameraPreset(name) {
+      const preset = cameraPresets[name];
+      if (!preset) return;
+      releaseCameraFocus(false);
+      camera.position.copy(preset.position);
+      controls.target.copy(preset.target);
+      controls.update();
+      document.getElementById('hud-focus').innerText = name;
+      toast(t('cameraPreset'), name);
+    }
+
+
+    const qolPanel = document.getElementById('qol-panel');
+    const qolButton = document.getElementById('qol-btn');
+    const qolFollowClose = document.getElementById('qol-follow-close');
+    const qolSereneDrift = document.getElementById('qol-serene-drift');
+    const qolDimUi = document.getElementById('qol-dim-ui');
+
+    function closeFloatingPanels({ includeInfo = true } = {}) {
+      closePalette();
+      document.getElementById('help-panel').style.display = 'none';
+      tourPanel.classList.remove('open');
+      document.getElementById('tour-btn').classList.remove('active');
+      if (typeof tourActive !== 'undefined') tourActive = false;
+      radioPanel.classList.remove('open');
+      qolPanel.classList.remove('open');
+      if (includeInfo) document.getElementById('info-panel').classList.remove('open');
+    }
+
+    qolButton.onclick = () => qolPanel.classList.toggle('open');
+    document.getElementById('qol-close').onclick = () => qolPanel.classList.remove('open');
+    qolFollowClose.onchange = () => { comfortSettings.keepFollowAfterInfoClose = qolFollowClose.checked; };
+    qolSereneDrift.onchange = () => {
+      comfortSettings.sereneDrift = qolSereneDrift.checked;
+      if (!comfortSettings.sereneDrift && !focusedBody) document.getElementById('hud-focus').innerText = 'Manual view';
+    };
+    qolDimUi.onchange = () => {
+      comfortSettings.dimUi = qolDimUi.checked;
+      document.body.classList.toggle('ui-dimmed', comfortSettings.dimUi);
+    };
+    document.getElementById('qol-release-focus').onclick = () => {
+      releaseCameraFocus();
+      document.getElementById('info-panel').classList.remove('open');
+      toast('Camera released', 'You stay exactly where you are; no snap back to the Sun.');
+    };
+    document.getElementById('qol-home-view').onclick = () => {
+      releaseCameraFocus(false);
+      applyCameraPreset('Hero flyby');
+    };
+    document.getElementById('qol-toggle-labels').onclick = () => labelsBtn.click();
+    document.getElementById('qol-toggle-orbits').onclick = () => orbitsBtn.click();
+    document.getElementById('qol-close-overlays').onclick = () => closeFloatingPanels();
+
+
+    const tourSteps = [
+      { target: 'Sun', title: 'The engine room', copy: '99.86% of the system mass lives here. Every orbit on screen is a negotiation with this star.' },
+      { target: 'Mercury', title: 'The scorched messenger', copy: 'Mercury shows how brutal sunlight becomes when there is almost no atmosphere to move heat around.' },
+      { target: 'Earth', title: 'The blue anomaly', copy: 'Day, night, clouds and atmosphere are layered separately so the only known living world feels alive.' },
+      { target: 'Jupiter', title: 'A solar system within the solar system', copy: 'Jupiter bends the asteroid belt, protects and threatens the inner worlds, and carries planet-sized moons.' },
+      { target: 'Saturn', title: 'The ring laboratory', copy: 'Saturn’s rings are thin, bright, young-looking structures made of countless icy fragments.' },
+      { target: 'Comet', title: 'A time capsule returns', copy: 'Halley’s comet dives inward on a tilted ellipse, growing a tail only when sunlight starts sculpting it.' },
+      { action: () => startLightTravel(), title: 'Light is fast. Space is bigger.', copy: 'Watch sunlight expand from the Sun and notice how long “now” takes to arrive at each world.' }
+    ];
+    let tourIndex = 0;
+    let tourActive = false;
+
+    function renderTourStep(executeAction = true) {
+      const step = tourSteps[tourIndex];
+      const localizedStep = I18N[currentLanguage].tourSteps?.[tourIndex] || I18N.en.tourSteps[tourIndex];
+      document.getElementById('tour-title').innerText = `${String(tourIndex + 1).padStart(2, '0')} · ${localizedStep[0]}`;
+      document.getElementById('tour-copy').innerText = localizedStep[1];
+      document.getElementById('tour-progress-bar').style.width = `${((tourIndex + 1) / tourSteps.length) * 100}%`;
+      document.getElementById('tour-play').innerText = tourActive ? t('tourPause') : t('tourStart');
+      if (executeAction) tourPanel.classList.add('open');
+      if (executeAction && step.target) focusBodyByName(step.target, false);
+      if (executeAction && step.action && tourActive) step.action();
+    }
+
+    function nextTourStep() {
+      tourIndex = (tourIndex + 1) % tourSteps.length;
+      renderTourStep();
+    }
+
+    document.getElementById('tour-btn').onclick = () => {
+      tourActive = !tourActive;
+      document.getElementById('tour-btn').classList.toggle('active', tourActive);
+      renderTourStep();
+      toast(tourActive ? t('grandTourOn') : t('grandTourOff'), t('grandTourDetail'));
+    };
+    document.getElementById('tour-play').onclick = () => document.getElementById('tour-btn').click();
+    document.getElementById('tour-next').onclick = nextTourStep;
+    document.getElementById('tour-prev').onclick = () => { tourIndex = (tourIndex - 1 + tourSteps.length) % tourSteps.length; renderTourStep(); };
+    document.getElementById('tour-close').onclick = () => { tourActive = false; tourPanel.classList.remove('open'); document.getElementById('tour-btn').classList.remove('active'); };
+
+    let commands = [];
+    function rebuildCommands() {
+      commands = [
+        ...Object.keys(PLANET_DATA).map(name => ({ label: t('focusCommand')(name), kind: t('bodyKind'), run: () => focusBodyByName(name) })),
+        ...Object.keys(cameraPresets).map(name => ({ label: name, kind: t('cameraKind'), run: () => applyCameraPreset(name) })),
+        { label: t('startTourCommand'), kind: t('tourKind'), run: () => document.getElementById('tour-btn').click() },
+        { label: t('lightTravelCommand'), kind: t('scienceKind'), run: startLightTravel },
+        { label: t('trueScaleCommand'), kind: t('scienceKind'), run: toggleTrueScale },
+        { label: t('orbitCommand'), kind: t('viewKind'), run: () => orbitsBtn.click() },
+        { label: t('labelCommand'), kind: t('viewKind'), run: () => labelsBtn.click() },
+        { label: t('snapshotCommand'), kind: t('exportKind'), run: downloadSnapshot },
+        { label: 'Toggle lofi radio', kind: 'audio', run: () => radioButton.click() },
+        { label: 'Open comfort menu', kind: 'comfort', run: () => qolButton.click() },
+        { label: 'Release camera focus', kind: 'comfort', run: () => document.getElementById('qol-release-focus').click() },
+        { label: 'Close all menus', kind: 'comfort', run: () => closeFloatingPanels() }
+      ];
+    }
+
+    function openPalette() {
+      palette.classList.add('open');
+      paletteInput.value = '';
+      renderPalette();
+      setTimeout(() => paletteInput.focus(), 0);
+    }
+
+    function closePalette() { palette.classList.remove('open'); }
+
+    function renderPalette() {
+      rebuildCommands();
+      const query = paletteInput.value.trim().toLowerCase();
+      const results = commands
+        .filter(command => !query || command.label.toLowerCase().includes(query) || command.kind.toLowerCase().includes(query))
+        .slice(0, 10);
+      paletteResults.innerHTML = results.map((command, index) => `
+        <button class="palette-item ${index === 0 ? 'active' : ''}" data-index="${commands.indexOf(command)}">
+          <span>${command.label}</span><span class="palette-kind">${command.kind}</span>
+        </button>`).join('') || `<div class="small" style="padding: 16px; color: var(--text-muted);">${t('noCommands')}</div>`;
+    }
+
+    paletteInput.addEventListener('input', renderPalette);
+    paletteResults.addEventListener('click', (event) => {
+      const button = event.target.closest('.palette-item');
+      if (!button) return;
+      const command = commands[Number(button.dataset.index)];
+      closePalette();
+      command.run();
+    });
+    palette.addEventListener('mousedown', event => { if (event.target === palette) closePalette(); });
+    document.getElementById('palette-btn').onclick = openPalette;
+
+    document.getElementById('language-select').addEventListener('change', (event) => {
+      currentLanguage = event.target.value;
+      localStorage.setItem('solar-explorer-language', currentLanguage);
+      setStaticLanguage();
+      if (focusedBody?.userData?.name) showInfo(focusedBody.userData.name);
+      toast(t('languageToast')(t('languageName')));
+    });
+    setStaticLanguage();
+
+    let qualityMode = 'auto';
+    let targetPixelRatio = Math.min(window.devicePixelRatio, 2);
+    document.getElementById('quality-btn').onclick = () => {
+      qualityMode = qualityMode === 'auto' ? 'crisp' : qualityMode === 'crisp' ? 'battery' : 'auto';
+      const ratio = qualityMode === 'crisp' ? Math.min(window.devicePixelRatio, 2.5) : qualityMode === 'battery' ? 1 : targetPixelRatio;
+      renderer.setPixelRatio(ratio);
+      document.getElementById('quality-btn').innerText = qualityMode.toUpperCase();
+      toast(t('renderQuality'), t('qualityActive')(qualityMode));
+    };
+
+    function downloadSnapshot() {
+      renderer.render(scene, camera);
+      try {
+        const link = document.createElement('a');
+        link.download = `solar-system-explorer-${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = renderer.domElement.toDataURL('image/png');
+        link.click();
+        toast(t('snapshotExported'), t('snapshotDetail'));
+      } catch (error) {
+        toast(t('snapshotBlocked'), t('snapshotBlockedDetail'));
+      }
+    }
+    document.getElementById('snapshot-btn').onclick = downloadSnapshot;
+
+    function resizeConstellationCanvas() {
+      constellationCanvas.width = window.innerWidth * window.devicePixelRatio;
+      constellationCanvas.height = window.innerHeight * window.devicePixelRatio;
+      constellationCanvas.style.width = `${window.innerWidth}px`;
+      constellationCanvas.style.height = `${window.innerHeight}px`;
+      constellationCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    }
+    resizeConstellationCanvas();
+
+    function updateConstellationOverlay() {
+      constellationCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      const names = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn'];
+      const points = names.map(name => {
+        const vector = bodies[name].position.clone().project(camera);
+        return { name, x: (vector.x * 0.5 + 0.5) * window.innerWidth, y: (-vector.y * 0.5 + 0.5) * window.innerHeight, visible: vector.z < 1 };
+      }).filter(point => point.visible);
+      constellationCtx.save();
+      constellationCtx.strokeStyle = 'rgba(79, 195, 247, 0.20)';
+      constellationCtx.fillStyle = 'rgba(102, 255, 204, 0.70)';
+      constellationCtx.lineWidth = 1;
+      constellationCtx.beginPath();
+      points.forEach((point, index) => index ? constellationCtx.lineTo(point.x, point.y) : constellationCtx.moveTo(point.x, point.y));
+      constellationCtx.stroke();
+      points.forEach(point => {
+        constellationCtx.beginPath();
+        constellationCtx.arc(point.x, point.y, 2.5, 0, Math.PI * 2);
+        constellationCtx.fill();
+      });
+      constellationCtx.restore();
+    }
+
+    let fpsFrames = 0;
+    let fpsLast = performance.now();
+    let fpsValue = 60;
+    function updateMissionHud() {
+      fpsFrames++;
+      const now = performance.now();
+      if (now - fpsLast > 600) {
+        fpsValue = Math.round((fpsFrames * 1000) / (now - fpsLast));
+        fpsFrames = 0;
+        fpsLast = now;
+        document.getElementById('hud-fps').innerText = `${fpsValue}`;
+        if (qualityMode === 'auto') {
+          if (fpsValue < 42 && targetPixelRatio > 1) targetPixelRatio = Math.max(1, targetPixelRatio - 0.25);
+          if (fpsValue > 56 && targetPixelRatio < Math.min(window.devicePixelRatio, 2)) targetPixelRatio = Math.min(Math.min(window.devicePixelRatio, 2), targetPixelRatio + 0.25);
+          renderer.setPixelRatio(targetPixelRatio);
+        }
+      }
+      document.getElementById('hud-scale').innerText = trueScaleActive ? 'True' : 'Visual';
+      document.getElementById('hud-camera').innerText = `${Math.round(camera.position.length())}u`;
+      document.getElementById('perf-indicator').innerText = `RENDER: ${qualityMode} · ${renderer.getPixelRatio().toFixed(2)}x`;
+    }
+
+    toast(t('missionUpgraded'), t('missionUpgradedDetail'));
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+      if (e.key === 'Escape') { closeFloatingPanels(); return; }
+      if (palette.classList.contains('open') && e.key === 'Enter') {
+        const first = paletteResults.querySelector('.palette-item');
+        if (first) { closePalette(); commands[Number(first.dataset.index)].run(); }
+        return;
+      }
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT') playPauseBtn.click();
+      if (e.key.toLowerCase() === 'l') labelsBtn.click();
+      if (e.key.toLowerCase() === 'o') orbitsBtn.click();
+      if (e.key.toLowerCase() === 'f') document.getElementById('fullscreen-btn').click();
+      if (e.key.toLowerCase() === 't') document.getElementById('tour-btn').click();
+      if (['1','2','3','4','5'].includes(e.key)) applyCameraPreset(Object.keys(cameraPresets)[Number(e.key) - 1]);
+    });
+
+    // --- Window Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      resizeConstellationCanvas();
+    });
+
+
+    function updateSereneAutopilot(deltaTime) {
+      if (!comfortSettings.sereneDrift || focusedBody || trueScaleActive || palette.classList.contains('open')) return;
+      sereneTourTimer += deltaTime;
+      if (sereneTourTimer > 42) {
+        sereneTourTimer = 0;
+        sereneTourIndex = (sereneTourIndex + 1) % sereneTourTargets.length;
+        const body = bodies[sereneTourTargets[sereneTourIndex]];
+        if (body) {
+          const bodyPos = body.position.clone();
+          controls.target.lerp(bodyPos, 0.012);
+          document.getElementById('hud-focus').innerText = `Drifting near ${body.userData.name}`;
+        }
+      }
+    }
+
+    function updateFocusedCamera(deltaTime) {
+      if (!focusedBody) return;
+      const bodyPos = new THREE.Vector3();
+      focusedBody.getWorldPosition(bodyPos);
+      const radius = currentBodyRadius(focusedBody);
+      const name = focusedBody.userData.name;
+
+      if (focusFollowState.lastName !== name) {
+        focusFollowState.lastName = name;
+        focusFollowState.theta = Math.atan2(camera.position.z - bodyPos.z, camera.position.x - bodyPos.x);
+      }
+
+      const isStar = focusedBody.userData.type === 'star';
+      const safeDistance = Math.max(radius * (isStar ? 6.2 : 9.5), isStar ? 96 : 18);
+      const verticalLift = Math.max(radius * (isStar ? 1.8 : 3.0), isStar ? 38 : 7);
+      focusFollowState.theta += deltaTime * (isStar ? 0.018 : 0.028);
+
+      const orbitDrift = new THREE.Vector3(
+        Math.cos(focusFollowState.theta) * safeDistance,
+        verticalLift + Math.sin(focusFollowState.theta * 0.47) * radius * 0.55,
+        Math.sin(focusFollowState.theta) * safeDistance
+      );
+      focusFollowState.desiredPosition.copy(bodyPos).add(orbitDrift);
+      focusFollowState.desiredTarget.copy(bodyPos);
+
+      // Safety rail: never let the camera inhabit or clip through the selected world.
+      const away = focusFollowState.desiredPosition.clone().sub(bodyPos);
+      const minDistance = Math.max(radius * 3.8, 10);
+      if (away.length() < minDistance) {
+        away.setLength(minDistance);
+        focusFollowState.desiredPosition.copy(bodyPos).add(away);
+      }
+
+      const positionEase = 1 - Math.pow(0.985, deltaTime * 60);
+      const targetEase = 1 - Math.pow(0.975, deltaTime * 60);
+      camera.position.lerp(focusFollowState.desiredPosition, positionEase);
+      controls.target.lerp(focusFollowState.desiredTarget, targetEase);
+    }
+
+    // Place every body once before the first animation frame so a restored zero/paused form state never leaves a blank scene.
+    updateSimulation(0.016);
+
+    // --- Basic Animation Loop ---
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const deltaTime = clock.getDelta();
+
+      updateSimulation(deltaTime);
+      updateLightTravel();
+
+      updateSereneAutopilot(deltaTime);
+      updateFocusedCamera(deltaTime);
+      controls.autoRotate = !focusedBody && !trueScaleActive;
+
+      controls.update();
+      updateHover();
+      updateMissionHud();
+      updateConstellationOverlay();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
