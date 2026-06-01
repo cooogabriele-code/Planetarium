@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256" width="512" height="256" role="img" aria-label="2k_moon.svg local texture">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#d4d4d4"/>
+      <stop offset="0.42" stop-color="#858585"/>
+      <stop offset="1" stop-color="#27272a"/>
+    </linearGradient>
+    <filter id="noise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.045" numOctaves="5" seed="71" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0.55" result="grain"/>
+      <feBlend in="SourceGraphic" in2="grain" mode="overlay"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="512" height="256" fill="url(#g)" filter="url(#noise)"/>
+  <circle cx="150" cy="100" r="62" fill="#3f3f46" opacity="0.42" filter="url(#soft)"/>
+  <circle cx="370" cy="64" r="44" fill="#a3a3a3" opacity="0.32" filter="url(#soft)"/>
+  <circle cx="415" cy="190" r="58" fill="#52525b" opacity="0.36" filter="url(#soft)"/>
+</svg>

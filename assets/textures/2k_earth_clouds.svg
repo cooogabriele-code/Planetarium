@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256" width="512" height="256" role="img" aria-label="2k_earth_clouds.svg local texture">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="0.42" stop-color="#111827"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <filter id="noise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.045" numOctaves="5" seed="61" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0.55" result="grain"/>
+      <feBlend in="SourceGraphic" in2="grain" mode="overlay"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="512" height="256" fill="url(#g)" filter="url(#noise)"/>
+  <rect width="512" height="256" fill="#ffffff" opacity="0.04"/>
+  <g fill="#ffffff" opacity="0.62" filter="url(#soft)">
+    <ellipse cx="37" cy="122" rx="26" ry="6" transform="rotate(-24 37 122)"/>
+    <ellipse cx="120" cy="169" rx="39" ry="10" transform="rotate(-16 120 169)"/>
+    <ellipse cx="203" cy="216" rx="52" ry="14" transform="rotate(-8 203 216)"/>
+    <ellipse cx="286" cy="7" rx="65" ry="18" transform="rotate(0 286 7)"/>
+    <ellipse cx="369" cy="54" rx="78" ry="6" transform="rotate(8 369 54)"/>
+    <ellipse cx="452" cy="101" rx="26" ry="10" transform="rotate(16 452 101)"/>
+    <ellipse cx="535" cy="148" rx="39" ry="14" transform="rotate(24 535 148)"/>
+    <ellipse cx="58" cy="195" rx="52" ry="18" transform="rotate(-24 58 195)"/>
+    <ellipse cx="141" cy="242" rx="65" ry="6" transform="rotate(-16 141 242)"/>
+    <ellipse cx="224" cy="33" rx="78" ry="10" transform="rotate(-8 224 33)"/>
+    <ellipse cx="307" cy="80" rx="26" ry="14" transform="rotate(0 307 80)"/>
+    <ellipse cx="390" cy="127" rx="39" ry="18" transform="rotate(8 390 127)"/>
+    <ellipse cx="473" cy="174" rx="52" ry="6" transform="rotate(16 473 174)"/>
+    <ellipse cx="-4" cy="221" rx="65" ry="10" transform="rotate(24 -4 221)"/>
+    <ellipse cx="79" cy="12" rx="78" ry="14" transform="rotate(-24 79 12)"/>
+    <ellipse cx="162" cy="59" rx="26" ry="18" transform="rotate(-16 162 59)"/>
+    <ellipse cx="245" cy="106" rx="39" ry="6" transform="rotate(-8 245 106)"/>
+    <ellipse cx="328" cy="153" rx="52" ry="10" transform="rotate(0 328 153)"/>
+    <ellipse cx="411" cy="200" rx="65" ry="14" transform="rotate(8 411 200)"/>
+    <ellipse cx="494" cy="247" rx="78" ry="18" transform="rotate(16 494 247)"/>
+    <ellipse cx="17" cy="38" rx="26" ry="6" transform="rotate(24 17 38)"/>
+    <ellipse cx="100" cy="85" rx="39" ry="10" transform="rotate(-24 100 85)"/>
+    <ellipse cx="183" cy="132" rx="52" ry="14" transform="rotate(-16 183 132)"/>
+    <ellipse cx="266" cy="179" rx="65" ry="18" transform="rotate(-8 266 179)"/>
+  </g>
+</svg>

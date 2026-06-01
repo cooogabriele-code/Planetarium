@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256" width="512" height="256" role="img" aria-label="2k_venus_surface.svg local texture">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f2c078"/>
+      <stop offset="0.42" stop-color="#b7793f"/>
+      <stop offset="1" stop-color="#442615"/>
+    </linearGradient>
+    <filter id="noise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.045" numOctaves="5" seed="31" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0.55" result="grain"/>
+      <feBlend in="SourceGraphic" in2="grain" mode="overlay"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="512" height="256" fill="url(#g)" filter="url(#noise)"/>
+  <path d="M0 30.0 C120 12.0 230 50.0 512 22.0 L512 52.0 C330 72.0 180 35.0 0 65.0 Z" fill="rgba(255, 214, 153, .36)"/>
+  <path d="M0 122.5 C120 104.5 230 142.5 512 114.5 L512 144.5 C330 164.5 180 127.5 0 157.5 Z" fill="rgba(120, 53, 15, .28)"/>
+  <path d="M0 215.0 C120 197.0 230 235.0 512 207.0 L512 237.0 C330 257.0 180 220.0 0 250.0 Z" fill="rgba(251, 191, 36, .24)"/>
+  <circle cx="120" cy="80" r="90" fill="#fed7aa" opacity="0.18" filter="url(#soft)"/>
+  <circle cx="360" cy="160" r="130" fill="#7c2d12" opacity="0.22" filter="url(#soft)"/>
+</svg>

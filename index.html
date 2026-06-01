@@ -37,6 +37,7 @@
       width: 100vw;
       height: 100vh;
       z-index: 1;
+      touch-action: none;
     }
 
     /* UI Panels Shell */
@@ -430,6 +431,16 @@
       text-shadow: 0 0 12px var(--accent-glow);
     }
 
+    #author-credit {
+      margin-top: 5px;
+      color: rgba(237,246,255,0.54);
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      line-height: 1.2;
+      text-transform: uppercase;
+      text-shadow: 0 0 14px rgba(143,211,255,0.24);
+    }
+
     #mission-status {
       top: 68px;
       left: 20px;
@@ -437,6 +448,12 @@
       padding: 14px;
       display: grid;
       gap: 10px;
+    }
+
+    #mobile-telemetry-btn,
+    #mobile-palette-btn,
+    #mobile-panel-scrim {
+      display: none;
     }
 
     .status-grid {
@@ -891,6 +908,134 @@
       button { padding: 8px 10px; }
     }
 
+    @media (max-width: 768px) {
+      #header {
+        top: 12px;
+        left: 64px;
+        max-width: calc(100vw - 132px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #top-right-controls {
+        top: 12px;
+        right: 12px;
+        max-width: calc(100vw - 84px);
+      }
+      #top-right-controls #palette-btn { display: none; }
+
+      button,
+      .language-select {
+        min-height: 44px;
+      }
+
+      #mobile-panel-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        background: rgba(0,0,0,0.36);
+        backdrop-filter: blur(3px);
+      }
+      #mobile-panel-scrim.open { display: block; }
+
+      #mobile-telemetry-btn,
+      #mobile-palette-btn {
+        position: fixed;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border-radius: 50%;
+        z-index: 32;
+        font-size: 18px;
+        box-shadow: 0 12px 34px rgba(0,0,0,0.34), 0 0 18px var(--accent-glow);
+      }
+      #mobile-telemetry-btn { display: flex; top: 12px; left: 12px; }
+      #mobile-palette-btn { display: flex; right: 16px; bottom: 132px; }
+
+      #mission-status {
+        display: grid;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(330px, calc(100vw - 52px));
+        padding: 74px 16px 18px;
+        border-radius: 0 18px 18px 0;
+        z-index: 30;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-104%);
+        transition: transform 240ms ease, opacity 220ms ease;
+        align-content: start;
+      }
+      #mission-status.open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(0);
+      }
+
+      #bottom-panel {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        max-width: none;
+        padding: 10px;
+        gap: 8px;
+        justify-content: flex-start;
+        align-items: stretch;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+      }
+      #bottom-panel .control-group {
+        flex: 0 0 auto;
+        gap: 8px;
+        margin-left: 0 !important;
+        scroll-snap-align: start;
+      }
+      #bottom-panel .control-group:nth-child(3) {
+        min-width: min(310px, calc(100vw - 36px));
+      }
+      #bottom-panel input[type=range] { width: min(150px, 38vw); }
+      .data-readout { font-size: 13px; }
+
+      #info-panel {
+        left: 10px;
+        right: 10px;
+        top: auto;
+        bottom: 108px;
+        width: auto;
+        max-width: calc(100vw - 20px);
+        max-height: min(70vh, calc(100vh - 132px));
+        padding: 18px;
+        font-size: 14px;
+        transform: translateY(18px);
+      }
+      #info-panel.open { transform: translateY(0); }
+      .info-title { font-size: clamp(24px, 8vw, 32px); }
+      .info-content,
+      .info-fact,
+      .story-copy,
+      .info-row { font-size: 14px; }
+      .info-tab { min-height: 44px; }
+      .close-btn { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+
+      #command-palette {
+        align-items: flex-start;
+        padding: 9vh 10px 0;
+      }
+      .palette-card { width: 100%; }
+      #palette-input { font-size: 16px; padding: 16px; }
+      .palette-item { min-height: 44px; }
+
+      #toast-stack { right: 10px; bottom: 190px; }
+      #tour-panel, #qol-panel, #radio-panel { max-width: calc(100vw - 24px); }
+      #help-panel { left: 12px; right: 12px; width: auto; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
       body::after { display: none; }
@@ -903,6 +1048,9 @@
 
 
   <canvas id="constellation-layer" aria-hidden="true"></canvas>
+  <div id="mobile-panel-scrim" aria-hidden="true"></div>
+  <button id="mobile-telemetry-btn" aria-label="Open mission telemetry" aria-expanded="false">ℹ</button>
+  <button id="mobile-palette-btn" aria-label="Open command palette">🔍</button>
   <div id="lofi-caption">breathe with the orbits</div>
 
   <div id="mission-status" class="panel" aria-live="polite">
@@ -928,7 +1076,8 @@
   </div>
 
   <div id="header" class="mono accent small">
-    SOLAR SYSTEM EXPLORER
+    <div>SOLAR SYSTEM EXPLORER</div>
+    <div id="author-credit">Gabriele Maria Boncoddo</div>
   </div>
 
   <div id="top-right-controls">
@@ -1133,19 +1282,19 @@
 
     // --- Configuration & Constants ---
     const TEXTURES = {
-      sun: 'https://www.solarsystemscope.com/textures/download/2k_sun.jpg',
-      mercury: 'https://www.solarsystemscope.com/textures/download/2k_mercury.jpg',
-      venus: 'https://www.solarsystemscope.com/textures/download/2k_venus_surface.jpg',
-      earth_day: 'https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg',
-      earth_night: 'https://www.solarsystemscope.com/textures/download/2k_earth_nightmap.jpg',
-      earth_clouds: 'https://www.solarsystemscope.com/textures/download/2k_earth_clouds.jpg',
-      moon: 'https://www.solarsystemscope.com/textures/download/2k_moon.jpg',
-      mars: 'https://www.solarsystemscope.com/textures/download/2k_mars.jpg',
-      jupiter: 'https://www.solarsystemscope.com/textures/download/2k_jupiter.jpg',
-      saturn: 'https://www.solarsystemscope.com/textures/download/2k_saturn.jpg',
-      saturn_ring: 'https://www.solarsystemscope.com/textures/download/2k_saturn_ring_alpha.png',
-      uranus: 'https://www.solarsystemscope.com/textures/download/2k_uranus.jpg',
-      neptune: 'https://www.solarsystemscope.com/textures/download/2k_neptune.jpg'
+      sun: 'assets/textures/2k_sun.svg',
+      mercury: 'assets/textures/2k_mercury.svg',
+      venus: 'assets/textures/2k_venus_surface.svg',
+      earth_day: 'assets/textures/2k_earth_daymap.svg',
+      earth_night: 'assets/textures/2k_earth_nightmap.svg',
+      earth_clouds: 'assets/textures/2k_earth_clouds.svg',
+      moon: 'assets/textures/2k_moon.svg',
+      mars: 'assets/textures/2k_mars.svg',
+      jupiter: 'assets/textures/2k_jupiter.svg',
+      saturn: 'assets/textures/2k_saturn.svg',
+      saturn_ring: 'assets/textures/2k_saturn_ring_alpha.svg',
+      uranus: 'assets/textures/2k_uranus.svg',
+      neptune: 'assets/textures/2k_neptune.svg'
     };
 
     const PLANET_DATA = {
@@ -1402,13 +1551,14 @@
     const t = key => I18N[currentLanguage][key] ?? I18N.en[key] ?? key;
 
     // --- Three.js Setup ---
+    const isMobileDevice = navigator.maxTouchPoints > 0 || window.innerWidth < 768;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 20000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ antialias: !isMobileDevice, logarithmicDepthBuffer: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.domElement.id = 'space-canvas';
     renderer.domElement.setAttribute('aria-label', 'Relaxing animated solar system scene');
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(isMobileDevice ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1422,15 +1572,21 @@
     controls.autoRotateSpeed = 0.055;
     controls.minDistance = 5;
     controls.maxDistance = 10000;
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
+    renderer.domElement.addEventListener('touchstart', event => event.preventDefault(), { passive: false });
+    renderer.domElement.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
+    renderer.domElement.addEventListener('touchend', event => event.preventDefault(), { passive: false });
 
     camera.position.set(0, 150, 400);
     controls.update();
 
     // --- Texture Assets ---
     // Start with procedural fallbacks so the scene is never black, then upgrade to
-    // Solar System Scope maps when the browser allows them. Keep crossOrigin
-    // undefined: forcing "anonymous" sends an Origin header that this CDN does
-    // not answer with Access-Control-Allow-Origin.
+    // locally bundled SVG maps. Keeping the assets same-origin avoids GitHub Pages
+    // CORS failures and keeps snapshot export canvas-safe.
     const loadedTextures = {};
     const textureSubscribers = {};
     const textureLoader = new THREE.TextureLoader();
@@ -1496,13 +1652,13 @@
       (textureSubscribers[key] || []).forEach(apply => apply(loadedTextures[key]));
     }
 
-    function loadRemoteTextures() {
+    function loadBundledTextures() {
       Object.entries(TEXTURES).forEach(([key, url]) => {
         textureLoader.load(url, texture => {
           loadedTextures[key] = configureTexture(texture);
           notifyTextureReady(key);
         }, undefined, () => {
-          // Procedural fallback remains active; remote maps are an optional upgrade.
+          // Procedural fallback remains active if a bundled map cannot be loaded.
         });
       });
     }
@@ -1621,7 +1777,7 @@
     }
 
     createProceduralTextures();
-    loadRemoteTextures();
+    loadBundledTextures();
 
     // --- Starfield Implementation ---
     function createStarfield() {
@@ -2158,13 +2314,25 @@
 
     // --- Raycasting & Hover ---
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    const mouse = new THREE.Vector2(99, 99);
     let hoveredObject = null;
 
+    function updatePointerFromClient(clientX, clientY) {
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    }
+
     window.addEventListener('mousemove', (event) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      updatePointerFromClient(event.clientX, event.clientY);
     });
+
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 1) updatePointerFromClient(event.touches[0].clientX, event.touches[0].clientY);
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', (event) => {
+      if (event.touches.length === 1) updatePointerFromClient(event.touches[0].clientX, event.touches[0].clientY);
+    }, { passive: false });
 
     function updateHover() {
       raycaster.setFromCamera(mouse, camera);
@@ -2380,6 +2548,7 @@
 
     function hideInfo() {
       document.getElementById('info-panel').classList.remove('open');
+      if (!document.getElementById('mission-status').classList.contains('open')) document.getElementById('mobile-panel-scrim').classList.remove('open');
       if (!comfortSettings.keepFollowAfterInfoClose) releaseCameraFocus();
     }
 
@@ -2388,38 +2557,53 @@
       button.addEventListener('click', () => switchInfoTab(button.dataset.tab));
     });
 
+    function selectBodyFromPointer(clientX, clientY) {
+      updatePointerFromClient(clientX, clientY);
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(Object.values(bodies));
+      if (intersects.length === 0) return false;
+
+      const obj = intersects[0].object;
+      if (obj.userData && obj.userData.name) {
+        focusedBody = obj;
+        showInfo(obj.userData.name);
+        return true;
+      }
+      return false;
+    }
+
     window.addEventListener('mousedown', (event) => {
-      // If clicking outside panel when it's open, hide it
       const infoPanel = document.getElementById('info-panel');
       if (infoPanel.classList.contains('open') &&
           !infoPanel.contains(event.target) &&
           event.target.tagName !== 'BUTTON') {
-        // Only hide if we didn't hit a new object
+        updatePointerFromClient(event.clientX, event.clientY);
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(Object.values(bodies));
         if (intersects.length === 0) hideInfo();
       }
 
-      // Only trigger if clicking on canvas
       if (event.target.tagName !== 'CANVAS') return;
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(Object.values(bodies));
-
-      if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        if (obj.userData && obj.userData.name) {
-          focusedBody = obj;
-          showInfo(obj.userData.name);
-
-          // Calculate camera target position
-          const radius = obj.userData.radius || 1;
-          const targetDist = radius * 5 + 5;
-
-          // We'll update the target in the animate loop
-        }
-      }
+      selectBodyFromPointer(event.clientX, event.clientY);
     });
+
+    let touchStartPoint = null;
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 1) {
+        touchStartPoint = { x: event.touches[0].clientX, y: event.touches[0].clientY, time: performance.now() };
+      } else {
+        touchStartPoint = null;
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchend', (event) => {
+      if (!touchStartPoint || event.changedTouches.length !== 1 || event.touches.length > 0) return;
+      const touch = event.changedTouches[0];
+      const moved = Math.hypot(touch.clientX - touchStartPoint.x, touch.clientY - touchStartPoint.y);
+      const elapsed = performance.now() - touchStartPoint.time;
+      if (moved < 10 && elapsed < 450) selectBodyFromPointer(touch.clientX, touch.clientY);
+      touchStartPoint = null;
+    }, { passive: false });
 
     // --- Simulation Logic ---
     let simTime = 0;
@@ -3072,7 +3256,10 @@
       setTimeout(() => paletteInput.focus(), 0);
     }
 
-    function closePalette() { palette.classList.remove('open'); }
+    function closePalette() {
+      palette.classList.remove('open');
+      paletteInput.blur();
+    }
 
     function renderPalette() {
       rebuildCommands();
@@ -3095,7 +3282,36 @@
       command.run();
     });
     palette.addEventListener('mousedown', event => { if (event.target === palette) closePalette(); });
+    palette.addEventListener('touchstart', event => { if (event.target === palette) closePalette(); }, { passive: true });
     document.getElementById('palette-btn').onclick = openPalette;
+    document.getElementById('mobile-palette-btn').onclick = openPalette;
+
+    const mobilePanelScrim = document.getElementById('mobile-panel-scrim');
+    const mobileTelemetryButton = document.getElementById('mobile-telemetry-btn');
+    const missionStatusPanel = document.getElementById('mission-status');
+    const infoPanel = document.getElementById('info-panel');
+    function openMobileTelemetry() {
+      missionStatusPanel.classList.add('open');
+      mobilePanelScrim.classList.add('open');
+      mobileTelemetryButton.setAttribute('aria-expanded', 'true');
+    }
+    function closeMobileTelemetry() {
+      missionStatusPanel.classList.remove('open');
+      if (!infoPanel.classList.contains('open')) mobilePanelScrim.classList.remove('open');
+      mobileTelemetryButton.setAttribute('aria-expanded', 'false');
+    }
+    mobileTelemetryButton.onclick = () => missionStatusPanel.classList.contains('open') ? closeMobileTelemetry() : openMobileTelemetry();
+    mobilePanelScrim.addEventListener('click', () => {
+      const wasInfoOpen = infoPanel.classList.contains('open');
+      closeMobileTelemetry();
+      if (wasInfoOpen) hideInfo();
+    });
+
+    const originalShowInfo = showInfo;
+    showInfo = function showInfoWithMobileScrim(name) {
+      originalShowInfo(name);
+      if (window.innerWidth <= 768 && infoPanel.classList.contains('open')) mobilePanelScrim.classList.add('open');
+    };
 
     document.getElementById('language-select').addEventListener('change', (event) => {
       currentLanguage = event.target.value;
@@ -3106,11 +3322,12 @@
     });
     setStaticLanguage();
 
-    let qualityMode = 'auto';
-    let targetPixelRatio = Math.min(window.devicePixelRatio, 2);
+    let qualityMode = isMobileDevice ? 'low' : 'auto';
+    let targetPixelRatio = isMobileDevice ? 1 : Math.min(window.devicePixelRatio, 2);
+    document.getElementById('quality-btn').innerText = qualityMode.toUpperCase();
     document.getElementById('quality-btn').onclick = () => {
-      qualityMode = qualityMode === 'auto' ? 'crisp' : qualityMode === 'crisp' ? 'battery' : 'auto';
-      const ratio = qualityMode === 'crisp' ? Math.min(window.devicePixelRatio, 2.5) : qualityMode === 'battery' ? 1 : targetPixelRatio;
+      qualityMode = qualityMode === 'auto' ? 'crisp' : qualityMode === 'crisp' ? 'low' : 'auto';
+      const ratio = qualityMode === 'crisp' ? Math.min(window.devicePixelRatio, 2.5) : qualityMode === 'low' ? 1 : targetPixelRatio;
       renderer.setPixelRatio(ratio);
       document.getElementById('quality-btn').innerText = qualityMode.toUpperCase();
       toast(t('renderQuality'), t('qualityActive')(qualityMode));
